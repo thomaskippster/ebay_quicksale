@@ -352,6 +352,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
+                // BLOCK 2: Visuelle Fehlerzustände in der UI
                 OutlinedTextField(
                     value = draft.title,
                     onValueChange = { viewModel.updateDraft(draft.copy(title = it.take(80))) },
@@ -414,6 +415,23 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // BLOCK 3: Hilfe-Texte für Policies
+                if (paymentPolicy.isBlank() || fulfillmentPolicy.isBlank() || returnPolicy.isBlank() || merchantLocation.isBlank()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ Achtung: Business-Policies (Zahlung, Versand, Rückgabe) oder Merchant Location fehlen in den Einstellungen. Upload nicht möglich.",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // BLOCK 1: Erweiterte Validierung des Upload-Buttons
                 Button(
                     onClick = { 
                         ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
@@ -441,6 +459,10 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                              draft.title.isNotBlank() && 
                              draft.suggestedPrice.isNotBlank() &&
                              draft.condition.isNotBlank() &&
+                             paymentPolicy.isNotBlank() &&
+                             fulfillmentPolicy.isNotBlank() &&
+                             returnPolicy.isNotBlank() &&
+                             merchantLocation.isNotBlank() &&
                              uploadState !is UploadUiState.Loading,
                     modifier = Modifier
                         .fillMaxWidth()
