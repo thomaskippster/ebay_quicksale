@@ -300,7 +300,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 if (uploadState !is UploadUiState.Success) {
                     Button(
                         onClick = { 
-                            ebayAuthManager.getValidAccessToken(ebayClientSecret) { validToken ->
+                            ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
                                 if (validToken != null) {
                                     viewModel.uploadToEbay(
                                         draft = draft,

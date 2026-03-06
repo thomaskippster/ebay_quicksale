@@ -67,7 +67,7 @@ class EbayAuthManager(
         }
     }
 
-    fun getValidAccessToken(clientSecret: String, callback: (String?) -> Unit) {
+    fun getValidAccessToken(clientId: String, clientSecret: String, callback: (String?) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             val accessToken = settingsManager.ebayAccessToken.first()
             val refreshToken = settingsManager.ebayRefreshToken.first()
@@ -81,7 +81,7 @@ class EbayAuthManager(
             // (In einer echten App würde man das AuthState JSON serialisiert speichern)
             val authState = AuthState(serviceConfig)
             authState.update(TokenResponse.Builder(
-                TokenRequest.Builder(serviceConfig, "dummy_client_id").setRefreshToken(refreshToken).build()
+                TokenRequest.Builder(serviceConfig, clientId).setRefreshToken(refreshToken).build()
             ).setAccessToken(accessToken).setRefreshToken(refreshToken).build(), null)
 
             val clientAuth: ClientAuthentication = ClientSecretBasic(clientSecret)
