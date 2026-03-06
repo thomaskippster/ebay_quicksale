@@ -260,6 +260,29 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = { /* Upload Logik kommt im ViewModel */ },
+                    enabled = ebayAccessToken != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Text("Als Entwurf zu eBay hochladen")
+                }
+
+                if (ebayAccessToken == null) {
+                    Text(
+                        "Bitte verbinde dich zuerst in den Einstellungen mit eBay.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
             is QuiksaleUiState.Error -> {
                 Text(
