@@ -291,24 +291,21 @@ class QuiksaleViewModel : ViewModel() {
 
                 // 2. Fulfillment Policy
                 val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader)
-                val fulfillmentId = fulfillmentResponse.fulfillmentPolicies?.find { it.default == true }?.fulfillmentPolicyId
-                    ?: fulfillmentResponse.fulfillmentPolicies?.firstOrNull()?.fulfillmentPolicyId
+                val fulfillmentId = fulfillmentResponse.fulfillmentPolicies?.firstOrNull()?.policyId
                 if (fulfillmentId != null) {
                     settingsManager.saveEbayFulfillmentPolicy(fulfillmentId)
                 }
 
                 // 3. Payment Policy
                 val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader)
-                val paymentId = paymentResponse.paymentPolicies?.find { it.default == true }?.paymentPolicyId
-                    ?: paymentResponse.paymentPolicies?.firstOrNull()?.paymentPolicyId
+                val paymentId = paymentResponse.paymentPolicies?.firstOrNull()?.policyId
                 if (paymentId != null) {
                     settingsManager.saveEbayPaymentPolicy(paymentId)
                 }
 
                 // 4. Return Policy
                 val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader)
-                val returnId = returnResponse.returnPolicies?.find { it.default == true }?.returnPolicyId
-                    ?: returnResponse.returnPolicies?.firstOrNull()?.returnPolicyId
+                val returnId = returnResponse.returnPolicies?.firstOrNull()?.policyId
                 if (returnId != null) {
                     settingsManager.saveEbayReturnPolicy(returnId)
                 }

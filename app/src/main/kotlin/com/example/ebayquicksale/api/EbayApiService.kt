@@ -41,7 +41,7 @@ interface EbayApiService {
     suspend fun getFulfillmentPolicies(
         @Header("Authorization") authorization: String,
         @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
-    ): FulfillmentPolicyResponse
+    ): PolicyResponse
 
     /**
      * Ruft Zahlungs-Policies (Payment Policies) ab.
@@ -50,7 +50,7 @@ interface EbayApiService {
     suspend fun getPaymentPolicies(
         @Header("Authorization") authorization: String,
         @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
-    ): PaymentPolicyResponse
+    ): PolicyResponse
 
     /**
      * Ruft Rückgabe-Policies (Return Policies) ab.
@@ -59,7 +59,7 @@ interface EbayApiService {
     suspend fun getReturnPolicies(
         @Header("Authorization") authorization: String,
         @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
-    ): ReturnPolicyResponse
+    ): PolicyResponse
 
     /**
      * Ruft Standorte (Merchant Locations) ab.
