@@ -65,6 +65,10 @@ class QuiksaleViewModel : ViewModel() {
         _bitmaps.value = _bitmaps.value + bitmap
     }
 
+    fun removeBitmap(bitmap: Bitmap) {
+        _bitmaps.value = _bitmaps.value - bitmap
+    }
+
     fun generateDraft(apiKey: String, ebayAccessToken: String?) {
         val currentBitmaps = _bitmaps.value
         val currentNotes = _notes.value
