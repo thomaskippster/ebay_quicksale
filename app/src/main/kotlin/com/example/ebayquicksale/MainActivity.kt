@@ -263,6 +263,15 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     Text("Entwurf generieren (${capturedBitmaps.size} Bilder)")
                 }
             }
+
+            if (geminiApiKey.isBlank()) {
+                Text(
+                    "Bitte trage deinen Gemini API Key in den Einstellungen ein.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
 
         // Status Anzeige
@@ -279,13 +288,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 
                 ExposedDropdownMenuBox(
                     expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
+                    onExpandedChange = { if (uploadState !is UploadUiState.Loading) expanded = !expanded },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
                         value = draft.condition,
                         onValueChange = {},
                         readOnly = true,
+                        enabled = uploadState !is UploadUiState.Loading,
                         label = { Text("Zustand") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
@@ -348,6 +358,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     label = { Text("eBay Titel (max. 80 Zeichen)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    enabled = uploadState !is UploadUiState.Loading,
                     isError = draft.title.isBlank(),
                     supportingText = {
                         if (draft.title.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
@@ -366,6 +377,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         modifier = Modifier.width(120.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
+                        enabled = uploadState !is UploadUiState.Loading,
                         isError = draft.suggestedPrice.isBlank(),
                         supportingText = {
                             if (draft.suggestedPrice.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
@@ -377,6 +389,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         label = { Text("Kategorie ID") },
                         modifier = Modifier.width(150.dp),
                         singleLine = true,
+                        enabled = uploadState !is UploadUiState.Loading,
                         placeholder = { Text(draft.categoryKeywords) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = draft.categoryId.isBlank(),
@@ -394,6 +407,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         .fillMaxWidth()
                         .heightIn(min = 200.dp, max = 400.dp),
                     label = { Text("HTML Code") },
+                    enabled = uploadState !is UploadUiState.Loading,
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     minLines = 5
                 )
@@ -442,6 +456,21 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         )
                     } else {
                         Text("Als Entwurf zu eBay hochladen")
+                    }
+                }
+                
+                if (uploadState !is UploadUiState.Success) {
+                    OutlinedButton(
+                        onClick = { 
+                            ImageUtils.clearImageCache(context)
+                            viewModel.resetAll()
+                        },
+                        enabled = uploadState !is UploadUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text("Entwurf verwerfen", color = MaterialTheme.colorScheme.error)
                     }
                 }
 
