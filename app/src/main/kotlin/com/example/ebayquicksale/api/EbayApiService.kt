@@ -37,28 +37,25 @@ interface EbayApiService {
     /**
      * Ruft Versand-Policies (Fulfillment Policies) ab.
      */
-    @GET("sell/account/v1/fulfillment_policy")
+    @GET("sell/account/v1/fulfillment_policy?marketplace_id=EBAY_DE")
     suspend fun getFulfillmentPolicies(
-        @Header("Authorization") authorization: String,
-        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+        @Header("Authorization") authorization: String
     ): PolicyResponse
 
     /**
      * Ruft Zahlungs-Policies (Payment Policies) ab.
      */
-    @GET("sell/account/v1/payment_policy")
+    @GET("sell/account/v1/payment_policy?marketplace_id=EBAY_DE")
     suspend fun getPaymentPolicies(
-        @Header("Authorization") authorization: String,
-        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+        @Header("Authorization") authorization: String
     ): PolicyResponse
 
     /**
      * Ruft Rückgabe-Policies (Return Policies) ab.
      */
-    @GET("sell/account/v1/return_policy")
+    @GET("sell/account/v1/return_policy?marketplace_id=EBAY_DE")
     suspend fun getReturnPolicies(
-        @Header("Authorization") authorization: String,
-        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+        @Header("Authorization") authorization: String
     ): PolicyResponse
 
     /**
