@@ -85,7 +85,10 @@ class QuiksaleViewModel : ViewModel() {
                 val responseText = response.text
 
                 if (responseText != null) {
-                    val json = JSONObject(responseText)
+                    // Markdown-Tags entfernen, falls vorhanden
+                    val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
+                    
+                    val json = JSONObject(cleanJson)
                     var draft = EbayDraft(
                         title = json.optString("title", "Kein Titel"),
                         descriptionHtml = json.optString("description_html", ""),
@@ -161,10 +164,10 @@ class QuiksaleViewModel : ViewModel() {
                 if (inventoryResponse.isSuccessful) {
                     // 2. Offer erstellen
                     val priceValue = if (draft.suggestedPrice.isNotBlank()) {
-                        draft.suggestedPrice.replace(Regex("[^0-9.]"), "")
+                        draft.suggestedPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     } else {
-                        defaultPrice
-                    }.replace(",", ".")
+                        defaultPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
+                    }
 
                     val offerRequest = OfferRequest(
                         sku = sku,
