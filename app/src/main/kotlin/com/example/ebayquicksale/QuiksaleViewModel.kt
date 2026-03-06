@@ -123,19 +123,17 @@ class QuiksaleViewModel : ViewModel() {
                     val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
                     
                     val json = JSONObject(cleanJson)
+                    val rawHtmlDesc = json.optString("description_html", "")
                     
-                    // Verbessertes HTML-Cleaning:
-                    var htmlDesc = json.optString("description_html", "")
-                        .replace("```html", "")
-                        .replace("```", "")
-                        .trim()
-
-                    // Erst danach den rechtlichen Hinweis anhängen:
-                    htmlDesc += RECHTLICHER_HINWEIS
+                    // HTML bereinigen von Markdown-Tags
+                    val cleanHtml = rawHtmlDesc.replace("```html", "").replace("```", "").trim()
+                    
+                    // Rechtlichen Hinweis anhängen
+                    val finalHtml = cleanHtml + RECHTLICHER_HINWEIS
 
                     var draft = EbayDraft(
                         title = json.optString("title", "Kein Titel").take(80),
-                        descriptionHtml = htmlDesc,
+                        descriptionHtml = finalHtml,
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
                         condition = json.optString("condition", "USED_GOOD"),
@@ -224,14 +222,11 @@ class QuiksaleViewModel : ViewModel() {
                         defaultPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     }
 
+                    // Dynamische Dauer bestimmen
                     val duration = if (draft.listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
                     
-                    // Startzeit-Logik optimiert:
-                    val finalStartTime = if (draft.listingFormat == "AUCTION") {
-                        formatStartTime(startTimeText)
-                    } else {
-                        null
-                    }
+                    // Startzeit-Logik
+                    val finalStartTime = if (draft.listingFormat == "AUCTION") formatStartTime(startTimeText) else null
 
                     val offerRequest = OfferRequest(
                         sku = draft.sku,
