@@ -45,9 +45,14 @@ class QuiksaleViewModel : ViewModel() {
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
 
-    fun generateDraft(bitmap: Bitmap, notes: String, apiKey: String, ebayAccessToken: String?) {
+    fun generateDraft(bitmaps: List<Bitmap>, notes: String, apiKey: String, ebayAccessToken: String?) {
         if (apiKey.isBlank()) {
             _uiState.value = QuiksaleUiState.Error("API Key fehlt. Bitte in den Einstellungen eintragen.")
+            return
+        }
+
+        if (bitmaps.isEmpty()) {
+            _uiState.value = QuiksaleUiState.Error("Bitte nimm mindestens ein Foto auf.")
             return
         }
 
@@ -66,7 +71,7 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val prompt = """
-                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: '$notes'. 
+                    Du bist ein professioneller eBay-Verkäufer. Analysiere diese Bilder und die Notizen: '$notes'. 
                     Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt. 
                     Das JSON muss exakt diese Keys enthalten: 
                     "title" (max. 80 Zeichen), 
@@ -77,7 +82,7 @@ class QuiksaleViewModel : ViewModel() {
                 """.trimIndent()
 
                 val inputContent = content {
-                    image(bitmap)
+                    bitmaps.forEach { image(it) }
                     text(prompt)
                 }
 
