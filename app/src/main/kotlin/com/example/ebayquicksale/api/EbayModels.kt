@@ -1,4 +1,4 @@
-package com.example.ebayquicksale
+package com.example.ebayquicksale.api
 
 import com.google.gson.annotations.SerializedName
 
