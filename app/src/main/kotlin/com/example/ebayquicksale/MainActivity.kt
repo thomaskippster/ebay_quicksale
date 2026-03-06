@@ -1,15 +1,18 @@
 package com.example.ebayquicksale
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -31,11 +34,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
@@ -89,24 +96,36 @@ fun QuiksaleApp(settingsManager: SettingsManager) {
 fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     var notes by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val uiState by viewModel.uiState.collectAsState()
 
+    // Kamera-Launcher für das hochauflösende Bild
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
-            capturedBitmap = bitmap
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && photoUri != null) {
+            // Bitmap aus der Uri laden für Vorschau und ViewModel
+            try {
+                val inputStream = context.contentResolver.openInputStream(photoUri!!)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                capturedBitmap = bitmap
+            } catch (e: Exception) {
+                Toast.makeText(context, "Fehler beim Laden des Bildes", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
+    // Permission-Launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            cameraLauncher.launch()
+            val uri = createImageUri(context)
+            photoUri = uri
+            cameraLauncher.launch(uri)
         } else {
             Toast.makeText(context, "Kamera-Berechtigung verweigert", Toast.LENGTH_SHORT).show()
         }
@@ -124,7 +143,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
             onClick = { 
                 when (PackageManager.PERMISSION_GRANTED) {
                     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
-                        cameraLauncher.launch()
+                        val uri = createImageUri(context)
+                        photoUri = uri
+                        cameraLauncher.launch(uri)
                     }
                     else -> {
                         permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -226,6 +247,18 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
             else -> {}
         }
     }
+}
+
+private fun createImageUri(context: Context): Uri {
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+    val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+    val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
+    
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
 }
 
 @Composable
