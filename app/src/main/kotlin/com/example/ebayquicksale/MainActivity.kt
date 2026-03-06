@@ -46,19 +46,22 @@ import java.util.*
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
+    private lateinit var ebayAuthManager: EbayAuthManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settingsManager = SettingsManager(this)
+        ebayAuthManager = EbayAuthManager(this)
+        
         setContent {
-            QuiksaleApp(settingsManager)
+            QuiksaleApp(settingsManager, ebayAuthManager)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuiksaleApp(settingsManager: SettingsManager) {
+fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     val navController = rememberNavController()
     val viewModel: QuiksaleViewModel = viewModel()
     
@@ -87,7 +90,7 @@ fun QuiksaleApp(settingsManager: SettingsManager) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("main") { MainScreen(viewModel, settingsManager) }
-            composable("settings") { SettingsScreen(settingsManager) }
+            composable("settings") { SettingsScreen(settingsManager, ebayAuthManager) }
         }
     }
 }
@@ -279,12 +282,28 @@ private fun createImageUri(context: Context): Uri {
 }
 
 @Composable
-fun SettingsScreen(settingsManager: SettingsManager) {
+fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
+
+    val authLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        if (data != null) {
+            ebayAuthManager.handleAuthResponse(data) { token, error ->
+                if (token != null) {
+                    Toast.makeText(context, "Erfolgreich mit eBay verbunden!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Fehler: $error", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -294,6 +313,20 @@ fun SettingsScreen(settingsManager: SettingsManager) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
+
+        Button(
+            onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent()) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Mit eBay verbinden")
+        }
+
+        val hasToken = ebayAuthManager.getAccessToken() != null
+        if (hasToken) {
+            Text("Status: Mit eBay verbunden ✅", color = MaterialTheme.colorScheme.primary)
+        }
+
+        HorizontalDivider()
 
         OutlinedTextField(
             value = geminiApiKey,

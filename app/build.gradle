@@ -18,6 +18,9 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+        manifestPlaceholders = [
+            'appAuthRedirectScheme': 'quiksale'
+        ]
     }
 
     buildTypes {
@@ -58,6 +61,8 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.navigation:navigation-compose:2.7.7'
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
+    implementation 'net.openid:appauth:0.11.1'
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
 
     // Retrofit for eBay API
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
