@@ -15,7 +15,7 @@ import org.json.JSONObject
 data class EbayDraft(
     val title: String,
     val descriptionHtml: String,
-    val suggestedPrice: Double,
+    val suggestedPrice: String,
     val categoryKeywords: String
 )
 
@@ -52,11 +52,12 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val prompt = """
-                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: '$notes'. 
-                    Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt, das diese exakten Keys enthält: 
+                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: $notes. 
+                    Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt. 
+                    Das JSON muss exakt diese Keys enthalten: 
                     "title" (max. 80 Zeichen), 
-                    "description_html" (die ausführliche Beschreibung in HTML), 
-                    "suggested_price" (ein realistischer Startpreis als Float) und 
+                    "description_html" (die ausführliche Beschreibung in HTML formatiert), 
+                    "suggested_price" (ein realistischer Startpreis als String) und 
                     "category_keywords" (2-3 Suchbegriffe, um die eBay-Kategorie zu finden).
                 """.trimIndent()
 
@@ -73,7 +74,7 @@ class QuiksaleViewModel : ViewModel() {
                     val draft = EbayDraft(
                         title = json.optString("title", "Kein Titel"),
                         descriptionHtml = json.optString("description_html", ""),
-                        suggestedPrice = json.optDouble("suggested_price", 1.0),
+                        suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", "")
                     )
                     _uiState.value = QuiksaleUiState.Success(draft)

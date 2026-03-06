@@ -226,7 +226,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                     Column {
                         Text("Empfohlener Preis:", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = String.format("%.2f €", draft.suggestedPrice),
+                            text = if (draft.suggestedPrice.contains("€")) draft.suggestedPrice else "${draft.suggestedPrice} €",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
                         )
