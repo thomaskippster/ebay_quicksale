@@ -218,7 +218,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         .weight(1f)
                         .height(56.dp)
                 ) {
-                    Text("Bilder auswählen")
+                    Text("Galerie")
                 }
             }
         }
