@@ -358,6 +358,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             
                             Button(
                                 onClick = {
+                                    ImageUtils.clearImageCache(context)
                                     viewModel.resetAll()
                                 },
                                 modifier = Modifier

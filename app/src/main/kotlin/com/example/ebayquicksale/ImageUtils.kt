@@ -1,6 +1,8 @@
 package com.example.ebayquicksale
 
+import android.content.Context
 import android.graphics.Bitmap
+import java.io.File
 
 object ImageUtils {
     /**
@@ -25,5 +27,22 @@ object ImageUtils {
         }
 
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    }
+
+    /**
+     * Löscht alle temporären Bilder aus dem Cache-Verzeichnis, die mit "JPEG_" beginnen.
+     */
+    fun clearImageCache(context: Context) {
+        try {
+            val cacheDir = context.cacheDir
+            val files = cacheDir.listFiles()
+            files?.forEach { file ->
+                if (file.name.startsWith("JPEG_")) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
