@@ -298,7 +298,8 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         label = { Text("Kategorie ID") },
                         modifier = Modifier.width(150.dp),
                         singleLine = true,
-                        placeholder = { Text(draft.categoryKeywords) }
+                        placeholder = { Text(draft.categoryKeywords) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
 
