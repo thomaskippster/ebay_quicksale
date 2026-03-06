@@ -179,7 +179,6 @@ class QuiksaleViewModel : ViewModel() {
         draft: EbayDraft,
         bitmaps: List<Bitmap>,
         token: String,
-        imgurId: String,
         defaultPrice: String,
         merchantLocation: String,
         paymentId: String,
@@ -189,11 +188,11 @@ class QuiksaleViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                // 1. Bilder zu Imgur hochladen
-                _uploadState.value = UploadUiState.Loading("Bilder werden hochgeladen...")
-                val imageUrls = uploadImagesToImgur(bitmaps, imgurId)
+                // 1. Bilder zum eBay Picture Service (EPS) hochladen
+                _uploadState.value = UploadUiState.Loading("Bilder werden direkt bei eBay gespeichert...")
+                val imageUrls = uploadToEbayPictureService(bitmaps, token)
                 if (imageUrls.isEmpty()) {
-                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur. Prüfe die Imgur Client ID.")
+                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu eBay. Bitte prüfe deine Verbindung.")
                     return@launch
                 }
 
@@ -351,29 +350,24 @@ class QuiksaleViewModel : ViewModel() {
         return sdf.format(calendar.time)
     }
 
-    private suspend fun uploadImagesToImgur(bitmaps: List<Bitmap>, imgurId: String): List<String> {
-        if (imgurId.isBlank()) return emptyList()
-        
+    private suspend fun uploadToEbayPictureService(bitmaps: List<Bitmap>, token: String): List<String> {
         return bitmaps.map { bitmap ->
             viewModelScope.async {
                 try {
                     val resizedBitmap = ImageUtils.resizeBitmap(bitmap)
                     val stream = ByteArrayOutputStream()
-                    resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
                     val byteArray = stream.toByteArray()
+                    
                     val requestBody = byteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                    val body = MultipartBody.Part.createFormData("image", "upload.jpg", requestBody)
+                    val body = MultipartBody.Part.createFormData("file", "image.jpg", requestBody)
 
-                    val response = ImgurRetrofitClient.imgurApiService.uploadImage(
-                        authorization = "Client-ID $imgurId",
-                        image = body
+                    val response = EbayRetrofitClient.ebayApiService.uploadPicture(
+                        authorization = "Bearer $token",
+                        picture = body
                     )
 
-                    if (response.isSuccessful) {
-                        response.body()?.data?.link
-                    } else {
-                        null
-                    }
+                    response.FullSizeInternalURL
                 } catch (e: Exception) {
                     null
                 }
