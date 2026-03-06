@@ -19,7 +19,8 @@ data class EbayDraft(
     val descriptionHtml: String,
     val suggestedPrice: String,
     val categoryKeywords: String,
-    val categoryId: String = ""
+    val categoryId: String = "",
+    val condition: String = "USED_GOOD"
 )
 
 sealed interface QuiksaleUiState {
@@ -65,13 +66,14 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val prompt = """
-                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: $notes. 
+                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: '$notes'. 
                     Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt. 
                     Das JSON muss exakt diese Keys enthalten: 
                     "title" (max. 80 Zeichen), 
                     "description_html" (die ausführliche Beschreibung in HTML formatiert), 
-                    "suggested_price" (ein realistischer Startpreis als String) und 
-                    "category_keywords" (2-3 Suchbegriffe, um die eBay-Kategorie zu finden).
+                    "suggested_price" (ein realistischer Startpreis als String), 
+                    "category_keywords" (2-3 Suchbegriffe, um die eBay-Kategorie zu finden) und
+                    "condition" (MUSS exakt einer dieser Werte sein: NEW, LIKE_NEW, USED_EXCELLENT, USED_GOOD, USED_ACCEPTABLE, FOR_PARTS_OR_NOT_WORKING).
                 """.trimIndent()
 
                 val inputContent = content {
@@ -88,7 +90,8 @@ class QuiksaleViewModel : ViewModel() {
                         title = json.optString("title", "Kein Titel"),
                         descriptionHtml = json.optString("description_html", ""),
                         suggestedPrice = json.optString("suggested_price", "1.00"),
-                        categoryKeywords = json.optString("category_keywords", "")
+                        categoryKeywords = json.optString("category_keywords", ""),
+                        condition = json.optString("condition", "USED_GOOD")
                     )
 
                     // eBay Kategorie-Vorschläge abrufen, falls Token vorhanden
@@ -140,7 +143,8 @@ class QuiksaleViewModel : ViewModel() {
                     product = Product(
                         title = draft.title,
                         description = draft.descriptionHtml
-                    )
+                    ),
+                    condition = draft.condition
                 )
 
                 val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(

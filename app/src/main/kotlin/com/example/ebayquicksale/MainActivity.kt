@@ -217,6 +217,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
                 
+                Text(
+                    text = "Zustand: ${draft.condition}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+
                 Text("Vorschlag für eBay Titel:", style = MaterialTheme.typography.titleMedium)
                 SelectionContainer {
                     Text(
