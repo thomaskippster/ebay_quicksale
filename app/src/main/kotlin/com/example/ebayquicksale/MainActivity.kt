@@ -396,7 +396,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                "Erfolgreich als Entwurf hochgeladen! ✅",
+                                text = "Erfolgreich hochgeladen! ✅",
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                 ),
@@ -405,8 +405,8 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             )
                             Text(
                                 text = "Offer ID: ${successState.offerId}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
                             )
                             
                             Button(
