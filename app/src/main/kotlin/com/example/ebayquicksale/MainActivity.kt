@@ -100,8 +100,8 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
 
 @Composable
 fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
-    var notes by remember { mutableStateOf("") }
-    val capturedBitmaps = remember { mutableStateListOf<Bitmap>() }
+    val notes by viewModel.notes.collectAsState()
+    val capturedBitmaps by viewModel.bitmaps.collectAsState()
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
     
@@ -130,7 +130,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 val fullBitmap = BitmapFactory.decodeStream(inputStream)
                 if (fullBitmap != null) {
                     val resizedBitmap = ImageUtils.resizeBitmap(fullBitmap)
-                    capturedBitmaps.add(resizedBitmap)
+                    viewModel.addBitmap(resizedBitmap)
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Fehler beim Laden des Bildes", Toast.LENGTH_SHORT).show()
@@ -209,7 +209,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         
         OutlinedTextField(
             value = notes,
-            onValueChange = { notes = it },
+            onValueChange = { viewModel.updateNotes(it) },
             label = { Text("Mängel & Notizen") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
@@ -219,7 +219,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         if (uiState !is QuiksaleUiState.Success) {
             Button(
                 onClick = { 
-                    viewModel.generateDraft(capturedBitmaps.toList(), notes, geminiApiKey, ebayAccessToken)
+                    viewModel.generateDraft(geminiApiKey, ebayAccessToken)
                 },
                 enabled = capturedBitmaps.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
                 modifier = Modifier
@@ -307,7 +307,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                 if (validToken != null) {
                                     viewModel.uploadToEbay(
                                         draft = draft,
-                                        bitmaps = capturedBitmaps.toList(),
+                                        bitmaps = capturedBitmaps,
                                         token = validToken,
                                         imgurId = imgurClientId,
                                         defaultPrice = ebayStartPrice,
@@ -358,9 +358,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             
                             Button(
                                 onClick = {
-                                    notes = ""
-                                    capturedBitmaps.clear()
-                                    photoUri = null
                                     viewModel.resetAll()
                                 },
                                 modifier = Modifier

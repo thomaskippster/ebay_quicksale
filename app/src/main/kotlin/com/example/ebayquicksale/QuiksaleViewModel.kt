@@ -51,13 +51,30 @@ class QuiksaleViewModel : ViewModel() {
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
 
-    fun generateDraft(bitmaps: List<Bitmap>, notes: String, apiKey: String, ebayAccessToken: String?) {
+    private val _notes = MutableStateFlow("")
+    val notes: StateFlow<String> = _notes.asStateFlow()
+
+    private val _bitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
+    val bitmaps: StateFlow<List<Bitmap>> = _bitmaps.asStateFlow()
+
+    fun updateNotes(text: String) {
+        _notes.value = text
+    }
+
+    fun addBitmap(bitmap: Bitmap) {
+        _bitmaps.value = _bitmaps.value + bitmap
+    }
+
+    fun generateDraft(apiKey: String, ebayAccessToken: String?) {
+        val currentBitmaps = _bitmaps.value
+        val currentNotes = _notes.value
+
         if (apiKey.isBlank()) {
             _uiState.value = QuiksaleUiState.Error("API Key fehlt. Bitte in den Einstellungen eintragen.")
             return
         }
 
-        if (bitmaps.isEmpty()) {
+        if (currentBitmaps.isEmpty()) {
             _uiState.value = QuiksaleUiState.Error("Bitte nimm mindestens ein Foto auf.")
             return
         }
@@ -77,7 +94,7 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val prompt = """
-                    Du bist ein professioneller eBay-Verkäufer. Analysiere diese Bilder und die Notizen: '$notes'. 
+                    Du bist ein professioneller eBay-Verkäufer. Analysiere diese Bilder und die Notizen: '$currentNotes'. 
                     Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt. 
                     Das JSON muss exakt diese Keys enthalten: 
                     "title" (max. 80 Zeichen), 
@@ -88,7 +105,7 @@ class QuiksaleViewModel : ViewModel() {
                 """.trimIndent()
 
                 val inputContent = content {
-                    bitmaps.forEach { image(it) }
+                    currentBitmaps.forEach { image(it) }
                     text(prompt)
                 }
 
@@ -277,5 +294,7 @@ class QuiksaleViewModel : ViewModel() {
     fun resetAll() {
         _uiState.value = QuiksaleUiState.Idle
         _uploadState.value = UploadUiState.Idle
+        _notes.value = ""
+        _bitmaps.value = emptyList()
     }
 }
