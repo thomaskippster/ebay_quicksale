@@ -53,7 +53,7 @@ data class OfferRequest(
     val pricingSummary: PricingSummary,
     val categoryId: String,
     val merchantLocationKey: String? = null,
-    val listingPolicies: ListingPolicies = ListingPolicies("DEFAULT", "DEFAULT", "DEFAULT"),
+    val listingPolicies: ListingPolicies,
     val scheduledStartTime: String? = null
 )
 

@@ -221,11 +221,9 @@ class QuiksaleViewModel : ViewModel() {
                         defaultPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     }
 
-                    // Dynamische Dauer bestimmen
                     val duration = if (listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
-                    
-                    // Startzeit nur bei Auktionen setzen
-                    val finalStartTime = if (listingFormat == "AUCTION") formatStartTime(startTimeText) else null
+                    // Startzeit nur bei Auktionen nutzen
+                    val scheduledTime = if (listingFormat == "AUCTION") formatStartTime(startTimeText) else null
 
                     val offerRequest = OfferRequest(
                         sku = draft.sku,
@@ -241,7 +239,7 @@ class QuiksaleViewModel : ViewModel() {
                             paymentPolicyId = paymentId,
                             returnPolicyId = returnId
                         ),
-                        scheduledStartTime = finalStartTime
+                        scheduledStartTime = scheduledTime
                     )
 
                     val offerResponse = EbayRetrofitClient.ebayApiService.createOffer(
