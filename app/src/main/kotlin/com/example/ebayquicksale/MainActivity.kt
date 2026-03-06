@@ -202,19 +202,36 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                 CircularProgressIndicator()
             }
             is QuiksaleUiState.Success -> {
-                val successState = uiState as QuiksaleUiState.Success
+                val draft = (uiState as QuiksaleUiState.Success).draft
                 
                 Text("Vorschlag für eBay Titel:", style = MaterialTheme.typography.titleMedium)
                 SelectionContainer {
                     Text(
-                        text = successState.title,
+                        text = draft.title,
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(4.dp)
                     )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Empfohlener Preis:", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = String.format("%.2f €", draft.suggestedPrice),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Kategorie-Keywords:", style = MaterialTheme.typography.titleSmall)
+                        Text(text = draft.categoryKeywords, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
 
                 Text("Generierte Beschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
@@ -227,7 +244,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Text(
-                            text = successState.htmlContent,
+                            text = draft.descriptionHtml,
                             modifier = Modifier
                                 .padding(8.dp)
                                 .verticalScroll(rememberScrollState()),

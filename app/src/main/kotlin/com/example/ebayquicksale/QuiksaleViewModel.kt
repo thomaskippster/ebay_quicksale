@@ -12,14 +12,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+data class EbayDraft(
+    val title: String,
+    val descriptionHtml: String,
+    val suggestedPrice: Double,
+    val categoryKeywords: String
+)
+
 sealed interface QuiksaleUiState {
     object Idle : QuiksaleUiState
     object Loading : QuiksaleUiState
-    data class Success(
-        val title: String,
-        val keywords: String,
-        val htmlContent: String
-    ) : QuiksaleUiState
+    data class Success(val draft: EbayDraft) : QuiksaleUiState
     data class Error(val message: String) : QuiksaleUiState
 }
 
@@ -49,11 +52,12 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val prompt = """
-                    Du bist ein eBay-Experte. Analysiere das Bild und die Notizen: '$notes'. 
-                    Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, das exakt folgende Keys enthält: 
-                    'title' (ein passender eBay-Titel, max 80 Zeichen), 
-                    'category_keywords' (2-3 Suchbegriffe für die eBay-Kategoriefindung) und 
-                    'html_description' (die detaillierte Artikelbeschreibung formatiert in HTML).
+                    Du bist ein professioneller eBay-Verkäufer. Analysiere das Bild und die Notizen: '$notes'. 
+                    Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt, das diese exakten Keys enthält: 
+                    "title" (max. 80 Zeichen), 
+                    "description_html" (die ausführliche Beschreibung in HTML), 
+                    "suggested_price" (ein realistischer Startpreis als Float) und 
+                    "category_keywords" (2-3 Suchbegriffe, um die eBay-Kategorie zu finden).
                 """.trimIndent()
 
                 val inputContent = content {
@@ -66,15 +70,13 @@ class QuiksaleViewModel : ViewModel() {
 
                 if (responseText != null) {
                     val json = JSONObject(responseText)
-                    val title = json.optString("title", "Kein Titel generiert")
-                    val keywords = json.optString("category_keywords", "")
-                    val htmlDescription = json.optString("html_description", "Keine Beschreibung generiert")
-
-                    _uiState.value = QuiksaleUiState.Success(
-                        title = title,
-                        keywords = keywords,
-                        htmlContent = htmlDescription
+                    val draft = EbayDraft(
+                        title = json.optString("title", "Kein Titel"),
+                        descriptionHtml = json.optString("description_html", ""),
+                        suggestedPrice = json.optDouble("suggested_price", 1.0),
+                        categoryKeywords = json.optString("category_keywords", "")
                     )
+                    _uiState.value = QuiksaleUiState.Success(draft)
                 } else {
                     _uiState.value = QuiksaleUiState.Error("Keine Antwort von der KI erhalten.")
                 }
