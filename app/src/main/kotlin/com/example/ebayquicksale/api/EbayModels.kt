@@ -90,3 +90,7 @@ data class PolicyInfo(val name: String, val policyId: String)
 data class LocationResponse(val locations: List<LocationInfo>?)
 
 data class LocationInfo(val merchantLocationKey: String, val name: String)
+
+data class EbayPictureResponse(
+    val FullSizeInternalURL: String? = null
+)
