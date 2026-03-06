@@ -292,7 +292,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         isError = draft.condition.isBlank(),
                         supportingText = {
-                            if (draft.condition.isBlank()) Text("Zustand ist erforderlich", color = MaterialTheme.colorScheme.error)
+                            if (draft.condition.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
                         }
                     )
                     ExposedDropdownMenu(
