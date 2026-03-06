@@ -25,7 +25,6 @@ class SettingsManager(private val context: Context) {
         val EBAY_PAYMENT_POLICY = stringPreferencesKey("ebay_payment_policy")
         val EBAY_FULFILLMENT_POLICY = stringPreferencesKey("ebay_fulfillment_policy")
         val EBAY_RETURN_POLICY = stringPreferencesKey("ebay_return_policy")
-        val IMGUR_CLIENT_ID = stringPreferencesKey("imgur_client_id")
         val EBAY_LISTING_FORMAT = stringPreferencesKey("ebay_listing_format")
     }
 
@@ -71,10 +70,6 @@ class SettingsManager(private val context: Context) {
 
     val ebayReturnPolicy: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[EBAY_RETURN_POLICY] ?: ""
-    }
-
-    val imgurClientId: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[IMGUR_CLIENT_ID] ?: ""
     }
 
     val ebayListingFormat: Flow<String> = context.dataStore.data.map { preferences ->
@@ -152,12 +147,6 @@ class SettingsManager(private val context: Context) {
     suspend fun saveEbayReturnPolicy(id: String) {
         context.dataStore.edit { preferences ->
             preferences[EBAY_RETURN_POLICY] = id
-        }
-    }
-
-    suspend fun saveImgurClientId(id: String) {
-        context.dataStore.edit { preferences ->
-            preferences[IMGUR_CLIENT_ID] = id
         }
     }
 
