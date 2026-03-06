@@ -50,6 +50,7 @@ data class OfferRequest(
     val format: String = "FIXED_PRICE",
     val pricingSummary: PricingSummary,
     val categoryId: String,
+    val merchantLocationKey: String? = null,
     val listingPolicies: ListingPolicies = ListingPolicies("DEFAULT", "DEFAULT", "DEFAULT")
 )
 

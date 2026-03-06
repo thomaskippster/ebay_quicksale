@@ -105,6 +105,13 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
+    
+    // New settings for upload
+    val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
+    val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
+    val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
+    val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
+
     val uiState by viewModel.uiState.collectAsState()
     val uploadState by viewModel.uploadState.collectAsState()
 
@@ -268,7 +275,15 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                 Button(
                     onClick = { 
                         ebayAccessToken?.let { token ->
-                            viewModel.uploadToEbay(draft, token, ebayStartPrice)
+                            viewModel.uploadToEbay(
+                                draft = draft,
+                                token = token,
+                                defaultPrice = ebayStartPrice,
+                                merchantLocation = merchantLocation,
+                                paymentPolicy = paymentPolicy,
+                                fulfillmentPolicy = fulfillmentPolicy,
+                                returnPolicy = returnPolicy
+                            )
                         }
                     },
                     enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,
@@ -347,13 +362,17 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
-    // Collect all five settings as state
+    // Collect all settings as state
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
     val ebayClientId by settingsManager.ebayClientId.collectAsState(initial = "")
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
+    val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
+    val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
+    val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
+    val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -419,6 +438,38 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         if (ebayAccessToken != null) {
             Text("Status: Mit eBay verbunden ✅", color = MaterialTheme.colorScheme.primary)
         }
+
+        HorizontalDivider()
+
+        Text("eBay Business Policies & Location", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = merchantLocation,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayMerchantLocation(it) } },
+            label = { Text("Merchant Location Key") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("z.B. Berlin_12345") }
+        )
+
+        OutlinedTextField(
+            value = paymentPolicy,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
+            label = { Text("Payment Policy ID") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = fulfillmentPolicy,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(it) } },
+            label = { Text("Fulfillment Policy ID") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = returnPolicy,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } },
+            label = { Text("Return Policy ID") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         HorizontalDivider()
 

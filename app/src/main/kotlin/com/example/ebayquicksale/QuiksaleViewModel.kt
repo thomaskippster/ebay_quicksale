@@ -120,7 +120,15 @@ class QuiksaleViewModel : ViewModel() {
         }
     }
 
-    fun uploadToEbay(draft: EbayDraft, token: String, defaultPrice: String) {
+    fun uploadToEbay(
+        draft: EbayDraft,
+        token: String,
+        defaultPrice: String,
+        merchantLocation: String,
+        paymentPolicy: String,
+        fulfillmentPolicy: String,
+        returnPolicy: String
+    ) {
         _uploadState.value = UploadUiState.Loading
 
         viewModelScope.launch {
@@ -147,13 +155,19 @@ class QuiksaleViewModel : ViewModel() {
                         draft.suggestedPrice.replace(Regex("[^0-9.]"), "")
                     } else {
                         defaultPrice
-                    }
+                    }.replace(",", ".")
 
                     val offerRequest = OfferRequest(
                         sku = sku,
                         categoryId = draft.categoryId,
                         pricingSummary = PricingSummary(
                             price = Price(value = priceValue)
+                        ),
+                        merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null,
+                        listingPolicies = ListingPolicies(
+                            fulfillmentPolicyId = fulfillmentPolicy,
+                            paymentPolicyId = paymentPolicy,
+                            returnPolicyId = returnPolicy
                         )
                     )
 

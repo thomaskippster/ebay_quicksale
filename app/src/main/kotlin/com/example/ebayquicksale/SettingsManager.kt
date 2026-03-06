@@ -20,6 +20,10 @@ class SettingsManager(private val context: Context) {
         val EBAY_ACCESS_TOKEN = stringPreferencesKey("ebay_access_token")
         val EBAY_CLIENT_ID = stringPreferencesKey("ebay_client_id")
         val EBAY_CLIENT_SECRET = stringPreferencesKey("ebay_client_secret")
+        val EBAY_MERCHANT_LOCATION = stringPreferencesKey("ebay_merchant_location")
+        val EBAY_PAYMENT_POLICY = stringPreferencesKey("ebay_payment_policy")
+        val EBAY_FULFILLMENT_POLICY = stringPreferencesKey("ebay_fulfillment_policy")
+        val EBAY_RETURN_POLICY = stringPreferencesKey("ebay_return_policy")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -44,6 +48,22 @@ class SettingsManager(private val context: Context) {
 
     val ebayClientSecret: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[EBAY_CLIENT_SECRET] ?: ""
+    }
+
+    val ebayMerchantLocation: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_MERCHANT_LOCATION] ?: ""
+    }
+
+    val ebayPaymentPolicy: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_PAYMENT_POLICY] ?: ""
+    }
+
+    val ebayFulfillmentPolicy: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_FULFILLMENT_POLICY] ?: ""
+    }
+
+    val ebayReturnPolicy: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_RETURN_POLICY] ?: ""
     }
 
     suspend fun saveGeminiApiKey(key: String) {
@@ -83,6 +103,30 @@ class SettingsManager(private val context: Context) {
     suspend fun saveEbayClientSecret(secret: String) {
         context.dataStore.edit { preferences ->
             preferences[EBAY_CLIENT_SECRET] = secret
+        }
+    }
+
+    suspend fun saveEbayMerchantLocation(location: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_MERCHANT_LOCATION] = location
+        }
+    }
+
+    suspend fun saveEbayPaymentPolicy(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_PAYMENT_POLICY] = id
+        }
+    }
+
+    suspend fun saveEbayFulfillmentPolicy(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_FULFILLMENT_POLICY] = id
+        }
+    }
+
+    suspend fun saveEbayReturnPolicy(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_RETURN_POLICY] = id
         }
     }
 }
