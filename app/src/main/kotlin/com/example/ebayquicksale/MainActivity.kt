@@ -423,6 +423,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
+                if (draft.categoryId.isBlank() && ebayAccessToken != null) {
+                    Text(
+                        "Kategorie ID fehlt. Bitte manuell eintragen oder Entwurf neu generieren.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
                 when (uploadState) {
                     is UploadUiState.Success -> {
                         val successState = uploadState as UploadUiState.Success
