@@ -2,6 +2,7 @@ package com.example.ebayquicksale.api
 
 import com.google.gson.annotations.SerializedName
 
+// Taxonomy API Models (Existing)
 data class CategorySuggestionResponse(
     @SerializedName("categorySuggestions")
     val categorySuggestions: List<CategorySuggestion>?
@@ -19,4 +20,50 @@ data class Category(
     val categoryId: String,
     @SerializedName("categoryName")
     val categoryName: String
+)
+
+// Inventory API Models (New)
+data class InventoryItemRequest(
+    val product: Product,
+    val condition: String = "NEW",
+    val availability: Availability = Availability(ShipToLocationAvailability(1))
+)
+
+data class Product(
+    val title: String,
+    val description: String,
+    val imageUris: List<String> = emptyList()
+)
+
+data class Availability(
+    val shipToLocationAvailability: ShipToLocationAvailability
+)
+
+data class ShipToLocationAvailability(
+    val quantity: Int
+)
+
+// Offer API Models (New)
+data class OfferRequest(
+    val sku: String,
+    val marketplaceId: String = "EBAY_DE",
+    val format: String = "FIXED_PRICE",
+    val pricingSummary: PricingSummary,
+    val categoryId: String,
+    val listingPolicies: ListingPolicies = ListingPolicies("DEFAULT", "DEFAULT", "DEFAULT")
+)
+
+data class PricingSummary(
+    val price: Price
+)
+
+data class Price(
+    val value: String,
+    val currency: String = "EUR"
+)
+
+data class ListingPolicies(
+    val fulfillmentPolicyId: String,
+    val paymentPolicyId: String,
+    val returnPolicyId: String
 )
