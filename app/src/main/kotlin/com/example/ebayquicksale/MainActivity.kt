@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -117,6 +120,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
+    val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
     
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
@@ -364,7 +368,8 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                     paymentId = paymentPolicy,
                                     fulfillmentId = fulfillmentPolicy,
                                     returnId = returnPolicy,
-                                    startTimeText = ebayStartTime
+                                    startTimeText = ebayStartTime,
+                                    listingFormat = ebayListingFormat
                                 )
                             } else {
                                 Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
@@ -375,6 +380,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                              imgurClientId.isNotBlank() && 
                              draft.categoryId.isNotBlank() && 
                              draft.title.isNotBlank() && 
+                             draft.condition.isNotBlank() &&
                              uploadState !is UploadUiState.Loading,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -452,12 +458,19 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         }
                     }
                     is UploadUiState.Error -> {
-                        Text(
-                            text = (uploadState as UploadUiState.Error).message,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                        ) {
+                            Text(
+                                text = (uploadState as UploadUiState.Error).message,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
                     }
                     else -> {}
                 }
@@ -477,12 +490,20 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 }
             }
             is QuiksaleUiState.Error -> {
-                Text(
-                    text = (uiState as QuiksaleUiState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = (uiState as QuiksaleUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
             else -> {}
         }
@@ -518,6 +539,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
     val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
+    val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -590,6 +612,38 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 
         if (ebayAccessToken != null) {
             Text("Status: Mit eBay verbunden ✅", color = MaterialTheme.colorScheme.primary)
+        }
+
+        HorizontalDivider()
+
+        Text("eBay Marktplatz & Format", style = MaterialTheme.typography.titleMedium)
+        
+        Column(modifier = Modifier.selectableGroup()) {
+            val options = listOf("AUCTION", "FIXED_PRICE")
+            options.forEach { text ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .selectable(
+                            selected = (text == ebayListingFormat),
+                            onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(text) } },
+                            role = Role.RadioButton
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = (text == ebayListingFormat),
+                        onClick = null // null because the Row handle the click
+                    )
+                    Text(
+                        text = if (text == "AUCTION") "Auktion" else "Festpreis",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+            }
         }
 
         HorizontalDivider()

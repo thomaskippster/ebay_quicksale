@@ -26,6 +26,7 @@ class SettingsManager(private val context: Context) {
         val EBAY_FULFILLMENT_POLICY = stringPreferencesKey("ebay_fulfillment_policy")
         val EBAY_RETURN_POLICY = stringPreferencesKey("ebay_return_policy")
         val IMGUR_CLIENT_ID = stringPreferencesKey("imgur_client_id")
+        val EBAY_LISTING_FORMAT = stringPreferencesKey("ebay_listing_format")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -74,6 +75,10 @@ class SettingsManager(private val context: Context) {
 
     val imgurClientId: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[IMGUR_CLIENT_ID] ?: ""
+    }
+
+    val ebayListingFormat: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_LISTING_FORMAT] ?: "AUCTION"
     }
 
     suspend fun saveGeminiApiKey(key: String) {
@@ -153,6 +158,12 @@ class SettingsManager(private val context: Context) {
     suspend fun saveImgurClientId(id: String) {
         context.dataStore.edit { preferences ->
             preferences[IMGUR_CLIENT_ID] = id
+        }
+    }
+
+    suspend fun saveEbayListingFormat(format: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_LISTING_FORMAT] = format
         }
     }
 }

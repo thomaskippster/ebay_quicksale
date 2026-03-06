@@ -48,7 +48,7 @@ data class ShipToLocationAvailability(
 data class OfferRequest(
     val sku: String,
     val marketplaceId: String = "EBAY_DE",
-    val format: String = "AUCTION",
+    val format: String,
     val listingDuration: String = "DAYS_7",
     val pricingSummary: PricingSummary,
     val categoryId: String,
