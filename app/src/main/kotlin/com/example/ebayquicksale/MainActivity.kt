@@ -15,6 +15,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -27,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -98,7 +101,7 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
 @Composable
 fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     var notes by remember { mutableStateOf("") }
-    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val capturedBitmaps = remember { mutableStateListOf<Bitmap>() }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
     
@@ -107,7 +110,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     
-    // New settings for upload
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
@@ -121,11 +123,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && photoUri != null) {
-            // Bitmap aus der Uri laden für Vorschau und ViewModel
             try {
                 val inputStream = context.contentResolver.openInputStream(photoUri!!)
                 val bitmap = BitmapFactory.decodeStream(inputStream)
-                capturedBitmap = bitmap
+                if (bitmap != null) {
+                    capturedBitmaps.add(bitmap)
+                }
             } catch (e: Exception) {
                 Toast.makeText(context, "Fehler beim Laden des Bildes", Toast.LENGTH_SHORT).show()
             }
@@ -153,7 +156,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (capturedBitmap == null) {
+        if (uiState !is QuiksaleUiState.Success) {
             Button(
                 onClick = { 
                     when (PackageManager.PERMISSION_GRANTED) {
@@ -171,22 +174,33 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     .fillMaxWidth()
                     .height(56.dp)
             ) {
-                Text("Foto aufnehmen")
+                Text(if (capturedBitmaps.isEmpty()) "Foto aufnehmen" else "Weiteres Foto aufnehmen")
             }
         }
 
-        capturedBitmap?.let { bitmap ->
-            Card(
+        if (capturedBitmaps.isNotEmpty()) {
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    .height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Vorschau des aufgenommenen Fotos",
-                    modifier = Modifier.fillMaxSize()
-                )
+                items(capturedBitmaps) { bitmap ->
+                    Card(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .fillMaxHeight(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Aufgenommenes Foto",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
             }
         }
         
@@ -202,11 +216,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         if (uiState !is QuiksaleUiState.Success) {
             Button(
                 onClick = { 
-                    capturedBitmap?.let { 
-                        viewModel.generateDraft(it, notes, geminiApiKey, ebayAccessToken)
-                    }
+                    viewModel.generateDraft(capturedBitmaps.toList(), notes, geminiApiKey, ebayAccessToken)
                 },
-                enabled = capturedBitmap != null && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
+                enabled = capturedBitmaps.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
@@ -214,16 +226,13 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 if (uiState is QuiksaleUiState.Loading) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Entwurf generieren")
+                    Text("Entwurf generieren (${capturedBitmaps.size} Bilder)")
                 }
             }
         }
 
         // Status Anzeige
         when (uiState) {
-            is QuiksaleUiState.Loading -> {
-                // Anzeige bereits im Button oder separat
-            }
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
                 
@@ -345,7 +354,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             Button(
                                 onClick = {
                                     notes = ""
-                                    capturedBitmap = null
+                                    capturedBitmaps.clear()
                                     photoUri = null
                                     viewModel.resetAll()
                                 },
