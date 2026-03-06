@@ -280,16 +280,20 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
 
                 Button(
                     onClick = { 
-                        ebayAccessToken?.let { token ->
-                            viewModel.uploadToEbay(
-                                draft = draft,
-                                token = token,
-                                defaultPrice = ebayStartPrice,
-                                merchantLocation = merchantLocation,
-                                paymentPolicy = paymentPolicy,
-                                fulfillmentPolicy = fulfillmentPolicy,
-                                returnPolicy = returnPolicy
-                            )
+                        ebayAuthManager.getValidAccessToken(ebayClientSecret) { validToken ->
+                            if (validToken != null) {
+                                viewModel.uploadToEbay(
+                                    draft = draft,
+                                    token = validToken,
+                                    defaultPrice = ebayStartPrice,
+                                    merchantLocation = merchantLocation,
+                                    paymentId = paymentPolicy,
+                                    fulfillmentId = fulfillmentPolicy,
+                                    returnId = returnPolicy
+                                )
+                            } else {
+                                Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
+                            }
                         }
                     },
                     enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,

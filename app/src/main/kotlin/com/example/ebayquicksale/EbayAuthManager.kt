@@ -5,7 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import net.openid.appauth.*
 
 class EbayAuthManager(
@@ -47,8 +49,13 @@ class EbayAuthManager(
             ) { tokenResponse, tokenException ->
                 if (tokenResponse != null) {
                     val accessToken = tokenResponse.accessToken
+                    val refreshToken = tokenResponse.refreshToken
+                    
+                    val authState = AuthState(response, tokenResponse, tokenException)
+                    
                     CoroutineScope(Dispatchers.IO).launch {
                         settingsManager.saveEbayAccessToken(accessToken)
+                        settingsManager.saveEbayRefreshToken(refreshToken)
                     }
                     callback(accessToken, null)
                 } else {
@@ -57,6 +64,40 @@ class EbayAuthManager(
             }
         } else {
             callback(null, ex?.message ?: "Auth failed")
+        }
+    }
+
+    fun getValidAccessToken(clientSecret: String, callback: (String?) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val accessToken = settingsManager.ebayAccessToken.first()
+            val refreshToken = settingsManager.ebayRefreshToken.first()
+            
+            if (accessToken == null || refreshToken == null) {
+                callback(null)
+                return@launch
+            }
+
+            // Wir bauen ein minimales AuthState Objekt aus den gespeicherten Daten
+            // (In einer echten App würde man das AuthState JSON serialisiert speichern)
+            val authState = AuthState(serviceConfig)
+            authState.update(TokenResponse.Builder(
+                TokenRequest.Builder(serviceConfig, "dummy_client_id").setRefreshToken(refreshToken).build()
+            ).setAccessToken(accessToken).setRefreshToken(refreshToken).build(), null)
+
+            val clientAuth: ClientAuthentication = ClientSecretBasic(clientSecret)
+            
+            authState.performActionWithFreshTokens(authService, clientAuth) { freshAccessToken, _, ex ->
+                if (freshAccessToken != null) {
+                    if (freshAccessToken != accessToken) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            settingsManager.saveEbayAccessToken(freshAccessToken)
+                        }
+                    }
+                    callback(freshAccessToken)
+                } else {
+                    callback(null)
+                }
+            }
         }
     }
 }
