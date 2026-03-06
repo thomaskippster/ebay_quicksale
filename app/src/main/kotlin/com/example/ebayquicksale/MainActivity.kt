@@ -352,7 +352,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
-                // BLOCK 2: Visuelle Fehlerzustände in der UI
                 OutlinedTextField(
                     value = draft.title,
                     onValueChange = { viewModel.updateDraft(draft.copy(title = it.take(80))) },
@@ -415,23 +414,28 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // BLOCK 3: Hilfe-Texte für Policies
-                if (paymentPolicy.isBlank() || fulfillmentPolicy.isBlank() || returnPolicy.isBlank() || merchantLocation.isBlank()) {
+                // SCHRITT 2: Spezifische Warnung bei fehlenden Policies
+                val missingFields = mutableListOf<String>()
+                if (merchantLocation.isBlank()) missingFields.add("Merchant Location")
+                if (paymentPolicy.isBlank()) missingFields.add("Zahlungs-Policy")
+                if (fulfillmentPolicy.isBlank()) missingFields.add("Versand-Policy")
+                if (returnPolicy.isBlank()) missingFields.add("Rückgabe-Policy")
+                
+                if (missingFields.isNotEmpty()) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     ) {
                         Text(
-                            text = "⚠️ Achtung: Business-Policies (Zahlung, Versand, Rückgabe) oder Merchant Location fehlen in den Einstellungen. Upload nicht möglich.",
+                            text = "⚠️ Fehler: Folgende Felder in den Einstellungen fehlen: " + missingFields.joinToString(", "),
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
 
-                // BLOCK 1: Erweiterte Validierung des Upload-Buttons
+                // SCHRITT 1: Erweiterte Validierung des Upload-Buttons
                 Button(
                     onClick = { 
                         ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
