@@ -36,7 +36,8 @@ data class Product(
 )
 
 data class Availability(
-    val shipToLocationAvailability: ShipToLocationAvailability
+    val shipToLocationAvailability: ShipToLocationAvailability,
+    val merchantLocationKey: String? = null
 )
 
 data class ShipToLocationAvailability(

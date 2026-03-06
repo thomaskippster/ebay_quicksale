@@ -128,9 +128,9 @@ class QuiksaleViewModel : ViewModel() {
         token: String,
         defaultPrice: String,
         merchantLocation: String,
-        paymentPolicy: String,
-        fulfillmentPolicy: String,
-        returnPolicy: String
+        paymentId: String,
+        fulfillmentId: String,
+        returnId: String
     ) {
         _uploadState.value = UploadUiState.Loading
 
@@ -142,9 +142,14 @@ class QuiksaleViewModel : ViewModel() {
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title,
-                        description = draft.descriptionHtml
+                        description = draft.descriptionHtml,
+                        imageUris = listOf("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/1024px-No_image_available.svg.png")
                     ),
-                    condition = draft.condition
+                    condition = draft.condition,
+                    availability = Availability(
+                        shipToLocationAvailability = ShipToLocationAvailability(1),
+                        merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null
+                    )
                 )
 
                 val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(
@@ -169,9 +174,9 @@ class QuiksaleViewModel : ViewModel() {
                         ),
                         merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null,
                         listingPolicies = ListingPolicies(
-                            fulfillmentPolicyId = fulfillmentPolicy,
-                            paymentPolicyId = paymentPolicy,
-                            returnPolicyId = returnPolicy
+                            fulfillmentPolicyId = fulfillmentId,
+                            paymentPolicyId = paymentId,
+                            returnPolicyId = returnId
                         )
                     )
 
