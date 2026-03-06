@@ -165,14 +165,34 @@ class QuiksaleViewModel : ViewModel() {
                     if (offerResponse.isSuccessful) {
                         _uploadState.value = UploadUiState.Success
                     } else {
-                        _uploadState.value = UploadUiState.Error("Fehler beim Erstellen des Angebots: ${offerResponse.code()}")
+                        val errorMsg = parseEbayError(offerResponse.errorBody()?.string())
+                        _uploadState.value = UploadUiState.Error("eBay Fehler (Offer): $errorMsg")
                     }
                 } else {
-                    _uploadState.value = UploadUiState.Error("Fehler beim Erstellen des Inventory Items: ${inventoryResponse.code()}")
+                    val errorMsg = parseEbayError(inventoryResponse.errorBody()?.string())
+                    _uploadState.value = UploadUiState.Error("eBay Fehler (Inventory): $errorMsg")
                 }
             } catch (e: Exception) {
                 _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
             }
+        }
+    }
+
+    private fun parseEbayError(errorJson: String?): String {
+        if (errorJson.isNullOrBlank()) return "Unbekannter API-Fehler"
+        return try {
+            val json = JSONObject(errorJson)
+            val errors = json.optJSONArray("errors")
+            if (errors != null && errors.length() > 0) {
+                val firstError = errors.getJSONObject(0)
+                val message = firstError.optString("message")
+                val longMessage = firstError.optString("longMessage")
+                if (longMessage.isNotBlank()) longMessage else message
+            } else {
+                errorJson
+            }
+        } catch (e: Exception) {
+            errorJson
         }
     }
     
