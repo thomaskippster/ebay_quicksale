@@ -104,7 +104,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
+    val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val uiState by viewModel.uiState.collectAsState()
+    val uploadState by viewModel.uploadState.collectAsState()
 
     // Kamera-Launcher für das hochauflösende Bild
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -264,8 +266,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
-                    onClick = { /* Upload Logik kommt im ViewModel */ },
-                    enabled = ebayAccessToken != null,
+                    onClick = { 
+                        ebayAccessToken?.let { token ->
+                            viewModel.uploadToEbay(draft, token, ebayStartPrice)
+                        }
+                    },
+                    enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp),
@@ -273,7 +279,35 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                         containerColor = MaterialTheme.colorScheme.tertiary
                     )
                 ) {
-                    Text("Als Entwurf zu eBay hochladen")
+                    if (uploadState is UploadUiState.Loading) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text("Als Entwurf zu eBay hochladen")
+                    }
+                }
+
+                when (uploadState) {
+                    is UploadUiState.Success -> {
+                        Text(
+                            "Erfolgreich als Entwurf hochgeladen! ✅",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            ),
+                            color = androidx.compose.ui.graphics.Color(0xFF2E7D32),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                    is UploadUiState.Error -> {
+                        Text(
+                            (uploadState as UploadUiState.Error).message,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                    else -> {}
                 }
 
                 if (ebayAccessToken == null) {
