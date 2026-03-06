@@ -12,6 +12,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -21,24 +24,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private lateinit var settingsManager: SettingsManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        settingsManager = SettingsManager(this)
         setContent {
-            QuiksaleApp()
+            QuiksaleApp(settingsManager)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuiksaleApp() {
+fun QuiksaleApp(settingsManager: SettingsManager) {
     val navController = rememberNavController()
     
     Scaffold(
@@ -66,7 +75,7 @@ fun QuiksaleApp() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("main") { MainScreen() }
-            composable("settings") { SettingsScreen() }
+            composable("settings") { SettingsScreen(settingsManager) }
         }
     }
 }
@@ -77,7 +86,6 @@ fun MainScreen() {
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val context = LocalContext.current
 
-    // Kamera-Launcher für das Vorschaubild
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
@@ -86,7 +94,6 @@ fun MainScreen() {
         }
     }
 
-    // Permission-Launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -122,7 +129,6 @@ fun MainScreen() {
             Text("Kamera starten")
         }
 
-        // Preview des aufgenommenen Bildes anzeigen
         capturedBitmap?.let { bitmap ->
             Card(
                 modifier = Modifier
@@ -151,11 +157,52 @@ fun MainScreen() {
 }
 
 @Composable
-fun SettingsScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+fun SettingsScreen(settingsManager: SettingsManager) {
+    val coroutineScope = rememberCoroutineScope()
+    
+    val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
+    val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
+    val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Einstellungen (Platzhalter)", style = MaterialTheme.typography.headlineMedium)
+        Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
+
+        OutlinedTextField(
+            value = geminiApiKey,
+            onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
+            label = { Text("Gemini API Key") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+
+        OutlinedTextField(
+            value = ebayStartPrice,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartPrice(it) } },
+            label = { Text("Standard-Startpreis (€)") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+        )
+
+        OutlinedTextField(
+            value = ebayStartTime,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartTime(it) } },
+            label = { Text("Standard-Startzeit") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("z.B. Donnerstag, 18:00 Uhr") }
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "Daten werden automatisch beim Tippen gespeichert.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
     }
 }
