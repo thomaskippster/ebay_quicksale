@@ -107,8 +107,10 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
+    val ebayClientId by settingsManager.ebayClientId.collectAsState(initial = "")
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
+    val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
     
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
@@ -306,17 +308,19 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                         draft = draft,
                                         bitmaps = capturedBitmaps.toList(),
                                         token = validToken,
+                                        imgurId = imgurClientId,
                                         defaultPrice = ebayStartPrice,
                                         merchantLocation = merchantLocation,
                                         paymentId = paymentPolicy,
                                         fulfillmentId = fulfillmentPolicy,
                                         returnId = returnPolicy
-                                    )                                } else {
+                                    )
+                                } else {
                                     Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
                                 }
                             }
                         },
-                        enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,
+                        enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && uploadState !is UploadUiState.Loading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp),
@@ -382,6 +386,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
+                } else if (imgurClientId.isBlank()) {
+                    Text(
+                        "Bitte trage deine Imgur Client ID in den Einstellungen ein.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
             is QuiksaleUiState.Error -> {
@@ -424,6 +434,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
+    val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -449,7 +460,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     ) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
 
-        Text("Gemini Konfiguration", style = MaterialTheme.typography.titleMedium)
+        Text("Gemini & Imgur Konfiguration", style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = geminiApiKey,
             onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
@@ -457,6 +468,14 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+
+        OutlinedTextField(
+            value = imgurClientId,
+            onValueChange = { coroutineScope.launch { settingsManager.saveImgurClientId(it) } },
+            label = { Text("Imgur Client ID") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Client-ID von api.imgur.com") }
         )
 
         HorizontalDivider()

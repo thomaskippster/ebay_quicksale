@@ -51,9 +51,6 @@ class QuiksaleViewModel : ViewModel() {
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
 
-    // Imgur Client ID (Hier später deine echte ID eintragen)
-    private val imgurClientId = "YOUR_IMGUR_CLIENT_ID"
-
     fun generateDraft(bitmaps: List<Bitmap>, notes: String, apiKey: String, ebayAccessToken: String?) {
         if (apiKey.isBlank()) {
             _uiState.value = QuiksaleUiState.Error("API Key fehlt. Bitte in den Einstellungen eintragen.")
@@ -142,6 +139,7 @@ class QuiksaleViewModel : ViewModel() {
         draft: EbayDraft,
         bitmaps: List<Bitmap>,
         token: String,
+        imgurId: String,
         defaultPrice: String,
         merchantLocation: String,
         paymentId: String,
@@ -153,9 +151,9 @@ class QuiksaleViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 // 1. Bilder zu Imgur hochladen
-                val imageUrls = uploadImagesToImgur(bitmaps)
+                val imageUrls = uploadImagesToImgur(bitmaps, imgurId)
                 if (imageUrls.isEmpty()) {
-                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur.")
+                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur. Prüfe die Imgur Client ID.")
                     return@launch
                 }
 
@@ -224,7 +222,9 @@ class QuiksaleViewModel : ViewModel() {
         }
     }
 
-    private suspend fun uploadImagesToImgur(bitmaps: List<Bitmap>): List<String> {
+    private suspend fun uploadImagesToImgur(bitmaps: List<Bitmap>, imgurId: String): List<String> {
+        if (imgurId.isBlank()) return emptyList()
+        
         return bitmaps.map { bitmap ->
             viewModelScope.async {
                 try {
@@ -235,7 +235,7 @@ class QuiksaleViewModel : ViewModel() {
                     val body = MultipartBody.Part.createFormData("image", "upload.jpg", requestBody)
 
                     val response = ImgurRetrofitClient.imgurApiService.uploadImage(
-                        authorization = "Client-ID $imgurClientId",
+                        authorization = "Client-ID $imgurId",
                         image = body
                     )
 
