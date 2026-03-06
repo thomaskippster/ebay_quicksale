@@ -160,6 +160,24 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
             Toast.makeText(context, "Kamera-Berechtigung verweigert", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // BLOCK 1: Galerie-Support hinzufügen
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        uris.forEach { uri ->
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                if (bitmap != null) {
+                    val resized = ImageUtils.resizeBitmap(bitmap)
+                    viewModel.addBitmap(resized)
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Fehler beim Laden aus Galerie", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -170,24 +188,38 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (uiState !is QuiksaleUiState.Success) {
-            Button(
-                onClick = { 
-                    when (PackageManager.PERMISSION_GRANTED) {
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
-                            val uri = createImageUri(context)
-                            photoUri = uri
-                            cameraLauncher.launch(uri)
-                        }
-                        else -> {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(if (capturedBitmaps.isEmpty()) "Foto aufnehmen" else "Weiteres Foto aufnehmen")
+                Button(
+                    onClick = { 
+                        when (PackageManager.PERMISSION_GRANTED) {
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
+                                val uri = createImageUri(context)
+                                photoUri = uri
+                                cameraLauncher.launch(uri)
+                            }
+                            else -> {
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                ) {
+                    Text(if (capturedBitmaps.isEmpty()) "Foto aufnehmen" else "Weiteres Foto")
+                }
+                
+                Button(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                ) {
+                    Text("Bilder auswählen")
+                }
             }
         }
 
@@ -361,7 +393,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     enabled = uploadState !is UploadUiState.Loading,
                     isError = draft.title.isBlank(),
                     supportingText = {
-                        if (draft.title.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                        if (draft.title.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                     }
                 )
 
@@ -380,7 +412,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         enabled = uploadState !is UploadUiState.Loading,
                         isError = draft.suggestedPrice.isBlank(),
                         supportingText = {
-                            if (draft.suggestedPrice.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                            if (draft.suggestedPrice.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                         }
                     )
                     OutlinedTextField(
@@ -394,7 +426,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = draft.categoryId.isBlank(),
                         supportingText = {
-                            if (draft.categoryId.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                            if (draft.categoryId.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                         }
                     )
                 }
@@ -412,14 +444,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     minLines = 5
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // SCHRITT 2: Spezifische Warnung bei fehlenden Policies
+                // SCHRITT 2: Dynamische Warnung bei fehlenden Policies
                 val missingFields = mutableListOf<String>()
-                if (merchantLocation.isBlank()) missingFields.add("Merchant Location")
-                if (paymentPolicy.isBlank()) missingFields.add("Zahlungs-Policy")
-                if (fulfillmentPolicy.isBlank()) missingFields.add("Versand-Policy")
-                if (returnPolicy.isBlank()) missingFields.add("Rückgabe-Policy")
+                if (merchantLocation.isBlank()) missingFields.add("Standort")
+                if (paymentPolicy.isBlank()) missingFields.add("Zahlung")
+                if (fulfillmentPolicy.isBlank()) missingFields.add("Versand")
+                if (returnPolicy.isBlank()) missingFields.add("Rückgabe")
                 
                 if (missingFields.isNotEmpty()) {
                     Card(
@@ -427,7 +457,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     ) {
                         Text(
-                            text = "⚠️ Fehler: Folgende Felder in den Einstellungen fehlen: " + missingFields.joinToString(", "),
+                            text = "⚠️ Fehler: Business-Policies fehlen in den Einstellungen: " + missingFields.joinToString(", "),
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodySmall
@@ -435,7 +465,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
-                // SCHRITT 1: Erweiterte Validierung des Upload-Buttons
+                // SCHRITT 3: Vollständige Sperre des Upload-Buttons
                 Button(
                     onClick = { 
                         ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
@@ -463,10 +493,10 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                              draft.title.isNotBlank() && 
                              draft.suggestedPrice.isNotBlank() &&
                              draft.condition.isNotBlank() &&
+                             merchantLocation.isNotBlank() &&
                              paymentPolicy.isNotBlank() &&
                              fulfillmentPolicy.isNotBlank() &&
                              returnPolicy.isNotBlank() &&
-                             merchantLocation.isNotBlank() &&
                              uploadState !is UploadUiState.Loading,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -761,25 +791,29 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             placeholder = { Text("z.B. Berlin_12345") }
         )
 
+        // BLOCK 3: Tastatur-Optimierung für IDs
         OutlinedTextField(
             value = paymentPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
             label = { Text("Payment Policy ID") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
         OutlinedTextField(
             value = fulfillmentPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(it) } },
             label = { Text("Fulfillment Policy ID") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
         OutlinedTextField(
             value = returnPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } },
             label = { Text("Return Policy ID") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
         HorizontalDivider()

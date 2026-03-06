@@ -124,11 +124,12 @@ class QuiksaleViewModel : ViewModel() {
                     
                     val json = JSONObject(cleanJson)
                     
-                    // BLOCK 4: HTML-Sicherheit
+                    // HTML-Sicherheit: Bereinigung der htmlDesc
                     var htmlDesc = json.optString("description_html", "")
                         .replace("```html", "")
                         .replace("```", "")
                         .trim()
+                        .replace(Regex("^\\s*[*\\-]\\s+"), "") // Entfernt führende Markdown-Bullets falls vorhanden
                     
                     // Rechtlichen Hinweis anhängen
                     htmlDesc += RECHTLICHER_HINWEIS
