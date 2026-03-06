@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -257,6 +259,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
         // Status Anzeige
         when (uiState) {
+            is QuiksaleUiState.Loading -> {
+                // Anzeige bereits im Button oder separat
+            }
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
                 
@@ -287,13 +292,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true
                     )
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("Kategorie ID:", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            text = if (draft.categoryId.isNotBlank()) draft.categoryId else draft.categoryKeywords,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+                    OutlinedTextField(
+                        value = draft.categoryId,
+                        onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it)) },
+                        label = { Text("Kategorie ID") },
+                        modifier = Modifier.width(150.dp),
+                        singleLine = true,
+                        placeholder = { Text(draft.categoryKeywords) }
+                    )
                 }
 
                 Text("Artikelbeschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
@@ -331,7 +337,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                 }
                             }
                         },
-                        enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && uploadState !is UploadUiState.Loading,
+                        enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && draft.categoryId.isNotBlank() && uploadState !is UploadUiState.Loading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp),
@@ -348,6 +354,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             Text("Als Entwurf zu eBay hochladen")
                         }
                     }
+                }
+
+                if (draft.categoryId.isBlank() && ebayAccessToken != null) {
+                    Text(
+                        "Kategorie ID fehlt. Bitte manuell eintragen oder Entwurf neu generieren.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
 
                 when (uploadState) {
