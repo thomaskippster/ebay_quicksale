@@ -21,12 +21,9 @@ class EbayAuthManager(
         Uri.parse("https://api.ebay.com/identity/v1/oauth2/token") // Token Endpoint
     )
 
-    // eBay Credentials (Placeholders - these should be moved to a secure config later)
-    private val clientId = "YOUR_EBAY_CLIENT_ID"
-    private val clientSecret = "YOUR_EBAY_CLIENT_SECRET"
     private val redirectUri = Uri.parse("quiksale://oauth2redirect")
 
-    fun createAuthIntent(): Intent {
+    fun createAuthIntent(clientId: String): Intent {
         val authRequest = AuthorizationRequest.Builder(
             serviceConfig,
             clientId,
@@ -38,7 +35,7 @@ class EbayAuthManager(
         return authService.getAuthorizationRequestIntent(authRequest)
     }
 
-    fun handleAuthResponse(intent: Intent, callback: (String?, String?) -> Unit) {
+    fun handleAuthResponse(intent: Intent, clientSecret: String, callback: (String?, String?) -> Unit) {
         val response = AuthorizationResponse.fromIntent(intent)
         val ex = AuthorizationException.fromIntent(intent)
 

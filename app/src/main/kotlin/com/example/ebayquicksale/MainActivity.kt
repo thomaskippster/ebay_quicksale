@@ -317,13 +317,15 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
+    val ebayClientId by settingsManager.ebayClientId.collectAsState(initial = "")
+    val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val data = result.data
         if (data != null) {
-            ebayAuthManager.handleAuthResponse(data) { token, error ->
+            ebayAuthManager.handleAuthResponse(data, ebayClientSecret) { token, error ->
                 if (token != null) {
                     Toast.makeText(context, "Erfolgreich mit eBay verbunden!", Toast.LENGTH_SHORT).show()
                 } else {
@@ -342,8 +344,27 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     ) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
 
+        Text("eBay Developer Credentials", style = MaterialTheme.typography.titleMedium)
+        
+        OutlinedTextField(
+            value = ebayClientId,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } },
+            label = { Text("eBay Client ID (App ID)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = ebayClientSecret,
+            onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientSecret(it) } },
+            label = { Text("eBay Client Secret (Cert ID)") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+
         Button(
-            onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent()) },
+            onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent(ebayClientId)) },
+            enabled = ebayClientId.isNotBlank() && ebayClientSecret.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Mit eBay verbinden")

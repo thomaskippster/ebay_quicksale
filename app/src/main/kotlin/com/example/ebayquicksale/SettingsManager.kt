@@ -18,6 +18,8 @@ class SettingsManager(private val context: Context) {
         val EBAY_START_PRICE = stringPreferencesKey("ebay_start_price")
         val EBAY_START_TIME = stringPreferencesKey("ebay_start_time")
         val EBAY_ACCESS_TOKEN = stringPreferencesKey("ebay_access_token")
+        val EBAY_CLIENT_ID = stringPreferencesKey("ebay_client_id")
+        val EBAY_CLIENT_SECRET = stringPreferencesKey("ebay_client_secret")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -34,6 +36,14 @@ class SettingsManager(private val context: Context) {
 
     val ebayAccessToken: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[EBAY_ACCESS_TOKEN]
+    }
+
+    val ebayClientId: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_CLIENT_ID] ?: ""
+    }
+
+    val ebayClientSecret: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_CLIENT_SECRET] ?: ""
     }
 
     suspend fun saveGeminiApiKey(key: String) {
@@ -61,6 +71,18 @@ class SettingsManager(private val context: Context) {
             } else {
                 preferences[EBAY_ACCESS_TOKEN] = token
             }
+        }
+    }
+
+    suspend fun saveEbayClientId(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_CLIENT_ID] = id
+        }
+    }
+
+    suspend fun saveEbayClientSecret(secret: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_CLIENT_SECRET] = secret
         }
     }
 }
