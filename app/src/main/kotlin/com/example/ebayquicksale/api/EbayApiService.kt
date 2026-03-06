@@ -33,4 +33,39 @@ interface EbayApiService {
         @Header("Content-Language") contentLanguage: String = "de-DE",
         @Body body: OfferRequest
     ): retrofit2.Response<OfferResponse>
+
+    /**
+     * Ruft Versand-Policies (Fulfillment Policies) ab.
+     */
+    @GET("sell/account/v1/fulfillment_policy")
+    suspend fun getFulfillmentPolicies(
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+    ): FulfillmentPolicyResponse
+
+    /**
+     * Ruft Zahlungs-Policies (Payment Policies) ab.
+     */
+    @GET("sell/account/v1/payment_policy")
+    suspend fun getPaymentPolicies(
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+    ): PaymentPolicyResponse
+
+    /**
+     * Ruft Rückgabe-Policies (Return Policies) ab.
+     */
+    @GET("sell/account/v1/return_policy")
+    suspend fun getReturnPolicies(
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String = "EBAY_DE"
+    ): ReturnPolicyResponse
+
+    /**
+     * Ruft Standorte (Merchant Locations) ab.
+     */
+    @GET("sell/inventory/v1/location")
+    suspend fun getLocations(
+        @Header("Authorization") authorization: String
+    ): LocationResponse
 }

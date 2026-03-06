@@ -100,7 +100,7 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("main") { MainScreen(viewModel, settingsManager, ebayAuthManager) }
-            composable("settings") { SettingsScreen(settingsManager, ebayAuthManager) }
+            composable("settings") { SettingsScreen(settingsManager, ebayAuthManager, viewModel) }
         }
     }
 }
@@ -270,13 +270,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
             }
         }
         
-        OutlinedTextField(
+        SafeTextField(
             value = notes,
             onValueChange = { viewModel.updateNotes(it) },
-            label = { Text("Mängel & Notizen") },
+            label = "Mängel & Notizen",
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            enabled = uiState !is QuiksaleUiState.Success
+            singleLine = false
         )
 
         if (uiState !is QuiksaleUiState.Success) {
@@ -384,13 +383,11 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
-                OutlinedTextField(
+                SafeTextField(
                     value = draft.title,
-                    onValueChange = { viewModel.updateDraft(draft.copy(title = it.take(80))) },
-                    label = { Text("eBay Titel (max. 80 Zeichen)") },
+                    onValueChange = { viewModel.updateDraft(draft.copy(title = it)) },
+                    label = "eBay Titel (max. 80 Zeichen)",
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = uploadState !is UploadUiState.Loading,
                     isError = draft.title.isBlank(),
                     supportingText = {
                         if (draft.title.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
@@ -402,27 +399,22 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
+                    SafeTextField(
                         value = draft.suggestedPrice,
                         onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it)) },
-                        label = { Text("Preis (€)") },
+                        label = "Preis (€)",
                         modifier = Modifier.width(120.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        enabled = uploadState !is UploadUiState.Loading,
                         isError = draft.suggestedPrice.isBlank(),
                         supportingText = {
                             if (draft.suggestedPrice.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                         }
                     )
-                    OutlinedTextField(
+                    SafeTextField(
                         value = draft.categoryId,
                         onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it)) },
-                        label = { Text("Kategorie ID") },
+                        label = "Kategorie ID",
                         modifier = Modifier.width(150.dp),
-                        singleLine = true,
-                        enabled = uploadState !is UploadUiState.Loading,
-                        placeholder = { Text(draft.categoryKeywords) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = draft.categoryId.isBlank(),
                         supportingText = {
@@ -432,16 +424,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 }
 
                 Text("Artikelbeschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
+                SafeTextField(
                     value = draft.descriptionHtml,
                     onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 200.dp, max = 400.dp),
-                    label = { Text("HTML Code") },
-                    enabled = uploadState !is UploadUiState.Loading,
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    minLines = 5
+                    label = "HTML Code",
+                    singleLine = false
                 )
 
                 // SCHRITT 2: Dynamische Warnung bei fehlenden Policies
@@ -646,7 +636,7 @@ private fun createImageUri(context: Context): Uri {
 }
 
 @Composable
-fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
+fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager, viewModel: QuiksaleViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
@@ -663,6 +653,8 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
     val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
     val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
+
+    val isFetchingSettings by viewModel.isFetchingSettings.collectAsState()
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -689,39 +681,36 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
 
         Text("Gemini & Imgur Konfiguration", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
+        SafeTextField(
             value = geminiApiKey,
             onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
-            label = { Text("Gemini API Key") },
+            label = "Gemini API Key",
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
 
-        OutlinedTextField(
+        SafeTextField(
             value = imgurClientId,
             onValueChange = { coroutineScope.launch { settingsManager.saveImgurClientId(it) } },
-            label = { Text("Imgur Client ID") },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Client-ID von api.imgur.com") }
+            label = "Imgur Client ID",
+            modifier = Modifier.fillMaxWidth()
         )
 
         HorizontalDivider()
 
         Text("eBay Developer Credentials", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
+        SafeTextField(
             value = ebayClientId,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } },
-            label = { Text("eBay Client ID (App ID)") },
+            label = "eBay Client ID (App ID)",
             modifier = Modifier.fillMaxWidth()
         )
 
-        OutlinedTextField(
+        SafeTextField(
             value = ebayClientSecret,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientSecret(it) } },
-            label = { Text("eBay Client Secret (Cert ID)") },
+            label = "eBay Client Secret (Cert ID)",
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
         )
 
@@ -731,6 +720,25 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Mit eBay verbinden")
+        }
+
+        Button(
+            onClick = { 
+                ebayAccessToken?.let { token ->
+                    viewModel.fetchEbaySettings(token, settingsManager) { message ->
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            enabled = ebayAccessToken != null && !isFetchingSettings,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+        ) {
+            if (isFetchingSettings) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onSecondary)
+            } else {
+                Text("eBay-Einstellungen automatisch laden")
+            }
         }
 
         if (ebayAccessToken != null) {
@@ -783,35 +791,34 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         HorizontalDivider()
 
         Text("eBay Business Policies & Location", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
+        SafeTextField(
             value = merchantLocation,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayMerchantLocation(it) } },
-            label = { Text("Merchant Location Key") },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("z.B. Berlin_12345") }
+            label = "Merchant Location Key",
+            modifier = Modifier.fillMaxWidth()
         )
 
         // SCHRITT 5: Tastatur-Optimierung
-        OutlinedTextField(
+        SafeTextField(
             value = paymentPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
-            label = { Text("Payment Policy ID") },
+            label = "Payment Policy ID",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
-        OutlinedTextField(
+        SafeTextField(
             value = fulfillmentPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(it) } },
-            label = { Text("Fulfillment Policy ID") },
+            label = "Fulfillment Policy ID",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
-        OutlinedTextField(
+        SafeTextField(
             value = returnPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } },
-            label = { Text("Return Policy ID") },
+            label = "Return Policy ID",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
@@ -819,20 +826,19 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         HorizontalDivider()
 
         Text("eBay Standard-Angebotsdaten", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
+        SafeTextField(
             value = ebayStartPrice,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartPrice(it) } },
-            label = { Text("Standard-Startpreis (€)") },
+            label = "Standard-Startpreis (€)",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
         )
 
-        OutlinedTextField(
+        SafeTextField(
             value = ebayStartTime,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartTime(it) } },
-            label = { Text("Standard-Startzeit") },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("z.B. Donnerstag, 18:00 Uhr") }
+            label = "Standard-Startzeit",
+            modifier = Modifier.fillMaxWidth()
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -842,4 +848,40 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             color = MaterialTheme.colorScheme.secondary
         )
     }
+}
+
+@Composable
+fun SafeTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    isError: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    // Lokaler Status für flüssiges Tippen ohne Cursor-Sprünge
+    var localText by remember { mutableStateOf(value) }
+
+    // Synchronisiere lokalen Status, wenn sich der externe Wert ändert (z.B. durch KI-Generierung)
+    LaunchedEffect(value) {
+        if (value != localText) {
+            localText = value
+        }
+    }
+
+    OutlinedTextField(
+        value = localText,
+        onValueChange = { newText ->
+            localText = newText
+            onValueChange(newText)
+        },
+        label = { Text(label) },
+        modifier = modifier,
+        singleLine = singleLine,
+        isError = isError,
+        supportingText = supportingText,
+        keyboardOptions = keyboardOptions
+    )
 }

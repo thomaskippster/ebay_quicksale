@@ -76,3 +76,50 @@ data class ListingPolicies(
     val paymentPolicyId: String,
     val returnPolicyId: String
 )
+
+// Response Models for Policy and Location Discovery
+data class FulfillmentPolicyResponse(
+    val fulfillmentPolicies: List<FulfillmentPolicy>? = null,
+    val total: Int? = null
+)
+
+data class FulfillmentPolicy(
+    val name: String,
+    val fulfillmentPolicyId: String,
+    val marketplaceId: String? = null,
+    val default: Boolean? = null
+)
+
+data class PaymentPolicyResponse(
+    val paymentPolicies: List<PaymentPolicy>? = null,
+    val total: Int? = null
+)
+
+data class PaymentPolicy(
+    val name: String,
+    val paymentPolicyId: String,
+    val marketplaceId: String? = null,
+    val default: Boolean? = null
+)
+
+data class ReturnPolicyResponse(
+    val returnPolicies: List<ReturnPolicy>? = null,
+    val total: Int? = null
+)
+
+data class ReturnPolicy(
+    val name: String,
+    val returnPolicyId: String,
+    val marketplaceId: String? = null,
+    val default: Boolean? = null
+)
+
+data class LocationResponse(
+    val locations: List<MerchantLocation>? = null,
+    val total: Int? = null
+)
+
+data class MerchantLocation(
+    val name: String,
+    val merchantLocationKey: String
+)

@@ -54,6 +54,9 @@ class QuiksaleViewModel : ViewModel() {
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
 
+    private val _isFetchingSettings = MutableStateFlow(false)
+    val isFetchingSettings: StateFlow<Boolean> = _isFetchingSettings.asStateFlow()
+
     private val _notes = MutableStateFlow("")
     val notes: StateFlow<String> = _notes.asStateFlow()
 
@@ -135,7 +138,7 @@ class QuiksaleViewModel : ViewModel() {
                     htmlDesc += RECHTLICHER_HINWEIS
 
                     var draft = EbayDraft(
-                        title = json.optString("title", "Kein Titel").take(80),
+                        title = json.optString("title", "Kein Titel"),
                         descriptionHtml = htmlDesc,
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
@@ -198,7 +201,7 @@ class QuiksaleViewModel : ViewModel() {
                 _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird erstellt...")
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
-                        title = draft.title,
+                        title = draft.title.take(80),
                         description = draft.descriptionHtml,
                         imageUris = imageUrls
                     ),
@@ -266,6 +269,64 @@ class QuiksaleViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
+            }
+        }
+    }
+
+    /**
+     * Ruft eBay-Einstellungen (Standort, Versand, Zahlung, Rückgabe) automatisch ab.
+     */
+    fun fetchEbaySettings(token: String, settingsManager: SettingsManager, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            _isFetchingSettings.value = true
+            try {
+                val authHeader = "Bearer $token"
+
+                // 1. Merchant Location
+                val locationsResponse = EbayRetrofitClient.ebayApiService.getLocations(authHeader)
+                val locationKey = locationsResponse.locations?.firstOrNull()?.merchantLocationKey
+                if (locationKey != null) {
+                    settingsManager.saveEbayMerchantLocation(locationKey)
+                }
+
+                // 2. Fulfillment Policy
+                val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader)
+                val fulfillmentId = fulfillmentResponse.fulfillmentPolicies?.find { it.default == true }?.fulfillmentPolicyId
+                    ?: fulfillmentResponse.fulfillmentPolicies?.firstOrNull()?.fulfillmentPolicyId
+                if (fulfillmentId != null) {
+                    settingsManager.saveEbayFulfillmentPolicy(fulfillmentId)
+                }
+
+                // 3. Payment Policy
+                val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader)
+                val paymentId = paymentResponse.paymentPolicies?.find { it.default == true }?.paymentPolicyId
+                    ?: paymentResponse.paymentPolicies?.firstOrNull()?.paymentPolicyId
+                if (paymentId != null) {
+                    settingsManager.saveEbayPaymentPolicy(paymentId)
+                }
+
+                // 4. Return Policy
+                val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader)
+                val returnId = returnResponse.returnPolicies?.find { it.default == true }?.returnPolicyId
+                    ?: returnResponse.returnPolicies?.firstOrNull()?.returnPolicyId
+                if (returnId != null) {
+                    settingsManager.saveEbayReturnPolicy(returnId)
+                }
+
+                if (locationKey == null || fulfillmentId == null || paymentId == null || returnId == null) {
+                    val missing = mutableListOf<String>()
+                    if (locationKey == null) missing.add("Standort")
+                    if (fulfillmentId == null) missing.add("Versand-Policy")
+                    if (paymentId == null) missing.add("Zahlungs-Policy")
+                    if (returnId == null) missing.add("Rückgabe-Policy")
+                    onResult("Teilweise erfolgreich. Fehlend: ${missing.joinToString(", ")}")
+                } else {
+                    onResult("Einstellungen wurden automatisch aktualisiert!")
+                }
+            } catch (e: Exception) {
+                onResult("Fehler beim Abrufen der eBay-Einstellungen: ${e.localizedMessage}")
+            } finally {
+                _isFetchingSettings.value = false
             }
         }
     }

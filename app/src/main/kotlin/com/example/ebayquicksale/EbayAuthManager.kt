@@ -7,7 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import net.openid.appauth.*
 
 class EbayAuthManager(
@@ -51,8 +50,6 @@ class EbayAuthManager(
                     val accessToken = tokenResponse.accessToken
                     val refreshToken = tokenResponse.refreshToken
                     
-                    val authState = AuthState(response, tokenResponse, tokenException)
-                    
                     CoroutineScope(Dispatchers.IO).launch {
                         settingsManager.saveEbayAccessToken(accessToken)
                         settingsManager.saveEbayRefreshToken(refreshToken)
@@ -86,7 +83,7 @@ class EbayAuthManager(
 
             val clientAuth: ClientAuthentication = ClientSecretBasic(clientSecret)
             
-            authState.performActionWithFreshTokens(authService, clientAuth) { freshAccessToken, _, ex ->
+            authState.performActionWithFreshTokens(authService, clientAuth) { freshAccessToken, _, _ ->
                 if (freshAccessToken != null) {
                     if (freshAccessToken != accessToken) {
                         CoroutineScope(Dispatchers.IO).launch {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ebayquicksale.QuiksaleViewModelTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-03-06T21:56:33" hostname="THOMAS-PC-NEU" time="0.15">
+  <properties/>
+  <testcase name="updateNotes updates notes state" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.13"/>
+  <testcase name="removeBitmap removes bitmap from list" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.002"/>
+  <testcase name="generateDraft fails when no bitmaps are added" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.004"/>
+  <testcase name="resetUploadState sets uploadState to Idle" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.003"/>
+  <testcase name="addBitmap adds bitmap to list" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.003"/>
+  <testcase name="updateDraft updates Success state with new draft" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.004"/>
+  <testcase name="resetAll resets all states to initial" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.002"/>
+  <testcase name="generateDraft fails when API key is blank" classname="com.example.ebayquicksale.QuiksaleViewModelTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
