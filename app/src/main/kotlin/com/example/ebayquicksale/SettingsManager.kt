@@ -17,6 +17,7 @@ class SettingsManager(private val context: Context) {
         val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
         val EBAY_START_PRICE = stringPreferencesKey("ebay_start_price")
         val EBAY_START_TIME = stringPreferencesKey("ebay_start_time")
+        val EBAY_ACCESS_TOKEN = stringPreferencesKey("ebay_access_token")
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->
@@ -29,6 +30,10 @@ class SettingsManager(private val context: Context) {
 
     val ebayStartTime: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[EBAY_START_TIME] ?: ""
+    }
+
+    val ebayAccessToken: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_ACCESS_TOKEN]
     }
 
     suspend fun saveGeminiApiKey(key: String) {
@@ -46,6 +51,16 @@ class SettingsManager(private val context: Context) {
     suspend fun saveEbayStartTime(time: String) {
         context.dataStore.edit { preferences ->
             preferences[EBAY_START_TIME] = time
+        }
+    }
+
+    suspend fun saveEbayAccessToken(token: String?) {
+        context.dataStore.edit { preferences ->
+            if (token == null) {
+                preferences.remove(EBAY_ACCESS_TOKEN)
+            } else {
+                preferences[EBAY_ACCESS_TOKEN] = token
+            }
         }
     }
 }

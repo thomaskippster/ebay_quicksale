@@ -3,13 +3,15 @@ package com.example.ebayquicksale
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import net.openid.appauth.*
-import net.openid.appauth.browser.AnyBrowserMatcher
-import net.openid.appauth.browser.BrowserAllowList
 
-class EbayAuthManager(private val context: Context) {
+class EbayAuthManager(
+    private val context: Context,
+    private val settingsManager: SettingsManager
+) {
 
     private val authService = AuthorizationService(context)
     
@@ -23,15 +25,6 @@ class EbayAuthManager(private val context: Context) {
     private val clientId = "YOUR_EBAY_CLIENT_ID"
     private val clientSecret = "YOUR_EBAY_CLIENT_SECRET"
     private val redirectUri = Uri.parse("quiksale://oauth2redirect")
-
-    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-    private val sharedPreferences = EncryptedSharedPreferences.create(
-        "ebay_auth_prefs",
-        masterKeyAlias,
-        context,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
 
     fun createAuthIntent(): Intent {
         val authRequest = AuthorizationRequest.Builder(
@@ -57,7 +50,9 @@ class EbayAuthManager(private val context: Context) {
             ) { tokenResponse, tokenException ->
                 if (tokenResponse != null) {
                     val accessToken = tokenResponse.accessToken
-                    saveAccessToken(accessToken)
+                    CoroutineScope(Dispatchers.IO).launch {
+                        settingsManager.saveEbayAccessToken(accessToken)
+                    }
                     callback(accessToken, null)
                 } else {
                     callback(null, tokenException?.message ?: "Token exchange failed")
@@ -66,13 +61,5 @@ class EbayAuthManager(private val context: Context) {
         } else {
             callback(null, ex?.message ?: "Auth failed")
         }
-    }
-
-    private fun saveAccessToken(token: String?) {
-        sharedPreferences.edit().putString("access_token", token).apply()
-    }
-
-    fun getAccessToken(): String? {
-        return sharedPreferences.getString("access_token", null)
     }
 }

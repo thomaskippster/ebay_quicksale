@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settingsManager = SettingsManager(this)
-        ebayAuthManager = EbayAuthManager(this)
+        ebayAuthManager = EbayAuthManager(this, settingsManager)
         
         setContent {
             QuiksaleApp(settingsManager, ebayAuthManager)
@@ -289,6 +289,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
+    val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -321,8 +322,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             Text("Mit eBay verbinden")
         }
 
-        val hasToken = ebayAuthManager.getAccessToken() != null
-        if (hasToken) {
+        if (ebayAccessToken != null) {
             Text("Status: Mit eBay verbunden ✅", color = MaterialTheme.colorScheme.primary)
         }
 
