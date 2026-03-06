@@ -1,9 +1,23 @@
 package com.example.ebayquicksale.api
 
+import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface EbayApiService {
     
+    /**
+     * Lädt ein Bild zum eBay Picture Service (EPS) hoch.
+     */
+    @Multipart
+    @POST("ws/api.dll") // Trading API endpoint often used for EPS uploads
+    suspend fun uploadPicture(
+        @Header("Authorization") authorization: String,
+        @Header("X-EBAY-API-CALL-NAME") callName: String = "UploadSiteHostedPictures",
+        @Header("X-EBAY-API-SITEID") siteId: String = "77", // 77 = Germany
+        @Header("X-EBAY-API-COMPATIBILITY-LEVEL") compatibilityLevel: String = "1191",
+        @Part picture: MultipartBody.Part
+    ): EbayPictureResponse
+
     /**
      * Ruft eBay-Kategorie-Vorschläge basierend auf einem Such-String ab.
      */
