@@ -122,17 +122,19 @@ class QuiksaleViewModel : ViewModel() {
                     val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
                     
                     val json = JSONObject(cleanJson)
-                    val htmlDesc = json.optString("description_html", "")
                     
-                    // HTML bereinigen von Markdown-Tags
-                    val cleanHtml = htmlDesc.replace("```html", "").replace("```", "").trim()
-                    
-                    // Rechtlichen Hinweis anhängen
-                    val finalHtml = cleanHtml + RECHTLICHER_HINWEIS
+                    // Verbessertes HTML-Cleaning:
+                    var htmlDesc = json.optString("description_html", "")
+                        .replace("```html", "")
+                        .replace("```", "")
+                        .trim()
+
+                    // Erst danach den rechtlichen Hinweis anhängen:
+                    htmlDesc += RECHTLICHER_HINWEIS
 
                     var draft = EbayDraft(
                         title = json.optString("title", "Kein Titel").take(80),
-                        descriptionHtml = finalHtml,
+                        descriptionHtml = htmlDesc,
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
                         condition = json.optString("condition", "USED_GOOD"),
