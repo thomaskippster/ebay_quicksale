@@ -172,7 +172,7 @@ class QuiksaleViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 // 1. Bilder zu Imgur hochladen
-                _uploadState.value = UploadUiState.Loading("Bilder werden zu Imgur hochladen...")
+                _uploadState.value = UploadUiState.Loading("Lade Bilder hoch...")
                 val imageUrls = uploadImagesToImgur(bitmaps, imgurId)
                 if (imageUrls.isEmpty()) {
                     _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur. Prüfe die Imgur Client ID.")
@@ -180,7 +180,7 @@ class QuiksaleViewModel : ViewModel() {
                 }
 
                 // 2. Inventory Item erstellen
-                _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird bei eBay erstellt...")
+                _uploadState.value = UploadUiState.Loading("Erstelle Inventar-Artikel...")
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title,
@@ -202,7 +202,7 @@ class QuiksaleViewModel : ViewModel() {
 
                 if (inventoryResponse.isSuccessful) {
                     // 3. Offer erstellen
-                    _uploadState.value = UploadUiState.Loading("eBay Angebot wird generiert...")
+                    _uploadState.value = UploadUiState.Loading("Generiere eBay-Angebot...")
                     val priceValue = if (draft.suggestedPrice.isNotBlank()) {
                         draft.suggestedPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     } else {
