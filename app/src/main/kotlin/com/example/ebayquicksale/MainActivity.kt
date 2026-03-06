@@ -251,7 +251,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
 
 private fun createImageUri(context: Context): Uri {
     val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val storageDir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+    val storageDir = context.cacheDir
     val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
     
     return FileProvider.getUriForFile(
