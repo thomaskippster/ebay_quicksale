@@ -49,7 +49,7 @@ data class OfferRequest(
     val sku: String,
     val marketplaceId: String = "EBAY_DE",
     val format: String,
-    val listingDuration: String = "DAYS_7",
+    val listingDuration: String,
     val pricingSummary: PricingSummary,
     val categoryId: String,
     val merchantLocationKey: String? = null,

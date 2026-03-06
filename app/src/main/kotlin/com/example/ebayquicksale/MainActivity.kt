@@ -289,7 +289,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         label = { Text("Zustand") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        isError = draft.condition.isBlank(),
+                        supportingText = { if(draft.condition.isBlank()) Text("Zustand ist erforderlich") }
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -313,7 +315,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     onValueChange = { viewModel.updateDraft(draft.copy(title = it.take(80))) },
                     label = { Text("eBay Titel (max. 80 Zeichen)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = draft.title.isBlank(),
+                    supportingText = { if(draft.title.isBlank()) Text("Titel darf nicht leer sein") }
                 )
 
                 Row(
@@ -327,7 +331,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         label = { Text("Preis (€)") },
                         modifier = Modifier.width(120.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
+                        singleLine = true,
+                        isError = draft.suggestedPrice.isBlank(),
+                        supportingText = { if(draft.suggestedPrice.isBlank()) Text("Preis fehlt") }
                     )
                     OutlinedTextField(
                         value = draft.categoryId,
@@ -336,7 +342,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         modifier = Modifier.width(150.dp),
                         singleLine = true,
                         placeholder = { Text(draft.categoryKeywords) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = draft.categoryId.isBlank(),
+                        supportingText = { if(draft.categoryId.isBlank()) Text("Kategorie fehlt") }
                     )
                 }
 
@@ -380,6 +388,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                              imgurClientId.isNotBlank() && 
                              draft.categoryId.isNotBlank() && 
                              draft.title.isNotBlank() && 
+                             draft.suggestedPrice.isNotBlank() &&
                              draft.condition.isNotBlank() &&
                              uploadState !is UploadUiState.Loading,
                     modifier = Modifier
@@ -412,14 +421,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-
-                if (draft.categoryId.isBlank() && ebayAccessToken != null) {
-                    Text(
-                        "Kategorie ID fehlt. Bitte manuell eintragen oder Entwurf neu generieren.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
                 }
 
                 when (uploadState) {
@@ -618,30 +619,35 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 
         Text("eBay Marktplatz & Format", style = MaterialTheme.typography.titleMedium)
         
-        Column(modifier = Modifier.selectableGroup()) {
-            val options = listOf("AUCTION", "FIXED_PRICE")
-            options.forEach { text ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .selectable(
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.selectableGroup().padding(8.dp)) {
+                val options = listOf("AUCTION", "FIXED_PRICE")
+                options.forEach { text ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .selectable(
+                                selected = (text == ebayListingFormat),
+                                onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(text) } },
+                                role = Role.RadioButton
+                            )
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
                             selected = (text == ebayListingFormat),
-                            onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(text) } },
-                            role = Role.RadioButton
+                            onClick = null
                         )
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = (text == ebayListingFormat),
-                        onClick = null // null because the Row handle the click
-                    )
-                    Text(
-                        text = if (text == "AUCTION") "Auktion" else "Festpreis",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
+                        Text(
+                            text = if (text == "AUCTION") "Auktion" else "Festpreis",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 16.dp)
+                        )
+                    }
                 }
             }
         }
