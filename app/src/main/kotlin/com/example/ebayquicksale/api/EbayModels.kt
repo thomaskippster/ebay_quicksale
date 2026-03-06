@@ -64,6 +64,10 @@ data class Price(
     val currency: String = "EUR"
 )
 
+data class OfferResponse(
+    val offerId: String
+)
+
 data class ListingPolicies(
     val fulfillmentPolicyId: String,
     val paymentPolicyId: String,

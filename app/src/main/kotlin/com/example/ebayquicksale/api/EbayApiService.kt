@@ -32,5 +32,5 @@ interface EbayApiService {
         @Header("Authorization") authorization: String,
         @Header("Content-Language") contentLanguage: String = "de-DE",
         @Body body: OfferRequest
-    ): retrofit2.Response<Map<String, String>>
+    ): retrofit2.Response<OfferResponse>
 }
