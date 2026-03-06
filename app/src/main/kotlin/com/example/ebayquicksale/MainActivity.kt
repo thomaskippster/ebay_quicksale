@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -24,10 +25,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -49,6 +53,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun QuiksaleApp(settingsManager: SettingsManager) {
     val navController = rememberNavController()
+    val viewModel: QuiksaleViewModel = viewModel()
     
     Scaffold(
         topBar = {
@@ -74,17 +79,20 @@ fun QuiksaleApp(settingsManager: SettingsManager) {
             startDestination = "main",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("main") { MainScreen() }
+            composable("main") { MainScreen(viewModel, settingsManager) }
             composable("settings") { SettingsScreen(settingsManager) }
         }
     }
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     var notes by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val context = LocalContext.current
+    
+    val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
+    val uiState by viewModel.uiState.collectAsState()
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -107,7 +115,8 @@ fun MainScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -124,9 +133,9 @@ fun MainScreen() {
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(56.dp)
         ) {
-            Text("Kamera starten")
+            Text("Foto aufnehmen")
         }
 
         capturedBitmap?.let { bitmap ->
@@ -148,11 +157,60 @@ fun MainScreen() {
             value = notes,
             onValueChange = { notes = it },
             label = { Text("Mängel & Notizen") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3
+        )
+
+        Button(
+            onClick = { 
+                capturedBitmap?.let { 
+                    viewModel.generateDraft(it, notes, geminiApiKey)
+                }
+            },
+            enabled = capturedBitmap != null && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            minLines = 5
-        )
+                .height(56.dp)
+        ) {
+            Text("Entwurf generieren")
+        }
+
+        // Status Anzeige
+        when (uiState) {
+            is QuiksaleUiState.Loading -> {
+                CircularProgressIndicator()
+            }
+            is QuiksaleUiState.Success -> {
+                val html = (uiState as QuiksaleUiState.Success).htmlContent
+                Text("Generierter Entwurf:", style = MaterialTheme.typography.titleMedium)
+                SelectionContainer {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text(
+                            text = html,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .verticalScroll(rememberScrollState()),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            is QuiksaleUiState.Error -> {
+                Text(
+                    text = (uiState as QuiksaleUiState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            else -> {}
+        }
     }
 }
 
