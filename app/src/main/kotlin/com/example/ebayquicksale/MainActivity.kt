@@ -265,10 +265,12 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
                 
-                Text(
-                    text = "Zustand: ${draft.condition}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
+                OutlinedTextField(
+                    value = draft.condition,
+                    onValueChange = { viewModel.updateDraft(draft.copy(condition = it)) },
+                    label = { Text("Zustand (z.B. USED_GOOD, NEW)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
 
                 OutlinedTextField(
