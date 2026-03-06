@@ -291,7 +291,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         isError = draft.condition.isBlank(),
-                        supportingText = { if(draft.condition.isBlank()) Text("Zustand ist erforderlich") }
+                        supportingText = {
+                            if (draft.condition.isBlank()) Text("Zustand ist erforderlich", color = MaterialTheme.colorScheme.error)
+                        }
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -317,7 +319,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = draft.title.isBlank(),
-                    supportingText = { if(draft.title.isBlank()) Text("Titel darf nicht leer sein") }
+                    supportingText = {
+                        if (draft.title.isBlank()) Text("Titel darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                    }
                 )
 
                 Row(
@@ -333,7 +337,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         isError = draft.suggestedPrice.isBlank(),
-                        supportingText = { if(draft.suggestedPrice.isBlank()) Text("Preis fehlt") }
+                        supportingText = {
+                            if (draft.suggestedPrice.isBlank()) Text("Preis fehlt", color = MaterialTheme.colorScheme.error)
+                        }
                     )
                     OutlinedTextField(
                         value = draft.categoryId,
@@ -344,7 +350,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         placeholder = { Text(draft.categoryKeywords) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = draft.categoryId.isBlank(),
-                        supportingText = { if(draft.categoryId.isBlank()) Text("Kategorie fehlt") }
+                        supportingText = {
+                            if (draft.categoryId.isBlank()) Text("Kategorie fehlt", color = MaterialTheme.colorScheme.error)
+                        }
                     )
                 }
 
@@ -421,14 +429,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-
-                if (draft.categoryId.isBlank() && ebayAccessToken != null) {
-                    Text(
-                        "Kategorie ID fehlt. Bitte manuell eintragen oder Entwurf neu generieren.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
                 }
 
                 when (uploadState) {
