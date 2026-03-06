@@ -374,11 +374,25 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 }
 
                 when (uploadState) {
+                    is UploadUiState.Loading -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            CircularProgressIndicator(size = 20.dp)
+                            Text(
+                                text = (uploadState as UploadUiState.Loading).message,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                     is UploadUiState.Success -> {
+                        val successState = uploadState as UploadUiState.Success
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
                                 "Erfolgreich als Entwurf hochgeladen! ✅",
@@ -387,6 +401,11 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                 ),
                                 color = androidx.compose.ui.graphics.Color(0xFF2E7D32),
                                 modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Text(
+                                text = "Offer ID: ${successState.offerId}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary
                             )
                             
                             Button(

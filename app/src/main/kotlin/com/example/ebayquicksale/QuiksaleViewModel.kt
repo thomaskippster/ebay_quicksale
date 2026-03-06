@@ -40,7 +40,7 @@ sealed interface QuiksaleUiState {
 sealed interface UploadUiState {
     object Idle : UploadUiState
     data class Loading(val message: String) : UploadUiState
-    object Success : UploadUiState
+    data class Success(val offerId: String) : UploadUiState
     data class Error(val message: String) : UploadUiState
 }
 
@@ -229,7 +229,8 @@ class QuiksaleViewModel : ViewModel() {
                     )
 
                     if (offerResponse.isSuccessful) {
-                        _uploadState.value = UploadUiState.Success
+                        val offerId = offerResponse.body()?.offerId ?: "Unbekannt"
+                        _uploadState.value = UploadUiState.Success(offerId)
                     } else {
                         val errorMsg = parseEbayError(offerResponse.errorBody()?.string())
                         _uploadState.value = UploadUiState.Error("eBay Fehler (Offer): $errorMsg")
