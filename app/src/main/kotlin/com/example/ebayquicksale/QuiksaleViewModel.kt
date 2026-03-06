@@ -95,7 +95,7 @@ class QuiksaleViewModel : ViewModel() {
                     
                     val json = JSONObject(cleanJson)
                     var draft = EbayDraft(
-                        title = json.optString("title", "Kein Titel"),
+                        title = json.optString("title", "Kein Titel").take(80),
                         descriptionHtml = json.optString("description_html", ""),
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
