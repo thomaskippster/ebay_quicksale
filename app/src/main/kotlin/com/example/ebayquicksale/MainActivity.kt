@@ -103,6 +103,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     val context = LocalContext.current
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
+    val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
     val uiState by viewModel.uiState.collectAsState()
 
     // Kamera-Launcher für das hochauflösende Bild
@@ -188,7 +189,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
         Button(
             onClick = { 
                 capturedBitmap?.let { 
-                    viewModel.generateDraft(it, notes, geminiApiKey)
+                    viewModel.generateDraft(it, notes, geminiApiKey, ebayAccessToken)
                 }
             },
             enabled = capturedBitmap != null && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
@@ -232,8 +233,11 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("Kategorie-Keywords:", style = MaterialTheme.typography.titleSmall)
-                        Text(text = draft.categoryKeywords, style = MaterialTheme.typography.bodySmall)
+                        Text("Kategorie ID:", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = if (draft.categoryId.isNotBlank()) draft.categoryId else draft.categoryKeywords,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
 
