@@ -127,9 +127,10 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         if (success && photoUri != null) {
             try {
                 val inputStream = context.contentResolver.openInputStream(photoUri!!)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                if (bitmap != null) {
-                    capturedBitmaps.add(bitmap)
+                val fullBitmap = BitmapFactory.decodeStream(inputStream)
+                if (fullBitmap != null) {
+                    val resizedBitmap = ImageUtils.resizeBitmap(fullBitmap)
+                    capturedBitmaps.add(resizedBitmap)
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Fehler beim Laden des Bildes", Toast.LENGTH_SHORT).show()

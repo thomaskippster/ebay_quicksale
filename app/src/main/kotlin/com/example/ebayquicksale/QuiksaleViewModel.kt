@@ -228,7 +228,7 @@ class QuiksaleViewModel : ViewModel() {
         return bitmaps.map { bitmap ->
             viewModelScope.async {
                 try {
-                    val resizedBitmap = resizeBitmap(bitmap)
+                    val resizedBitmap = ImageUtils.resizeBitmap(bitmap)
                     val stream = ByteArrayOutputStream()
                     resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
                     val byteArray = stream.toByteArray()
@@ -250,27 +250,6 @@ class QuiksaleViewModel : ViewModel() {
                 }
             }
         }.awaitAll().filterNotNull()
-    }
-
-    private fun resizeBitmap(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-
-        if (width <= maxSize && height <= maxSize) return bitmap
-
-        val ratio = width.toFloat() / height.toFloat()
-        val newWidth: Int
-        val newHeight: Int
-
-        if (width > height) {
-            newWidth = maxSize
-            newHeight = (maxSize / ratio).toInt()
-        } else {
-            newHeight = maxSize
-            newWidth = (maxSize * ratio).toInt()
-        }
-
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
 
     private fun parseEbayError(errorJson: String?): String {
