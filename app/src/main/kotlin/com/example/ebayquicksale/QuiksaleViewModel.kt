@@ -18,7 +18,8 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
-import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class EbayDraft(
     val title: String,
@@ -121,9 +122,13 @@ class QuiksaleViewModel : ViewModel() {
                     val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
                     
                     val json = JSONObject(cleanJson)
+                    var htmlDesc = json.optString("description_html", "")
+                    // Rechtlichen Hinweis anhängen
+                    htmlDesc += RECHTLICHER_HINWEIS
+
                     var draft = EbayDraft(
                         title = json.optString("title", "Kein Titel").take(80),
-                        descriptionHtml = json.optString("description_html", ""),
+                        descriptionHtml = htmlDesc,
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
                         condition = json.optString("condition", "USED_GOOD"),
@@ -167,12 +172,13 @@ class QuiksaleViewModel : ViewModel() {
         merchantLocation: String,
         paymentId: String,
         fulfillmentId: String,
-        returnId: String
+        returnId: String,
+        startTimeText: String
     ) {
         viewModelScope.launch {
             try {
                 // 1. Bilder zu Imgur hochladen
-                _uploadState.value = UploadUiState.Loading("Bilder werden hochgeladen...")
+                _uploadState.value = UploadUiState.Loading("Bilder werden zu Imgur hochgeladen...")
                 val imageUrls = uploadImagesToImgur(bitmaps, imgurId)
                 if (imageUrls.isEmpty()) {
                     _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur. Prüfe die Imgur Client ID.")
@@ -180,7 +186,7 @@ class QuiksaleViewModel : ViewModel() {
                 }
 
                 // 2. Inventory Item erstellen
-                _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird erstellt...")
+                _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird bei eBay erstellt...")
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title,
@@ -202,12 +208,15 @@ class QuiksaleViewModel : ViewModel() {
 
                 if (inventoryResponse.isSuccessful) {
                     // 3. Offer erstellen
-                    _uploadState.value = UploadUiState.Loading("Angebot wird generiert...")
+                    _uploadState.value = UploadUiState.Loading("Auktion wird bei eBay geplant...")
+                    
                     val priceValue = if (draft.suggestedPrice.isNotBlank()) {
                         draft.suggestedPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     } else {
                         defaultPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     }
+
+                    val scheduledTime = formatStartTime(startTimeText)
 
                     val offerRequest = OfferRequest(
                         sku = draft.sku,
@@ -220,7 +229,8 @@ class QuiksaleViewModel : ViewModel() {
                             fulfillmentPolicyId = fulfillmentId,
                             paymentPolicyId = paymentId,
                             returnPolicyId = returnId
-                        )
+                        ),
+                        scheduledStartTime = scheduledTime
                     )
 
                     val offerResponse = EbayRetrofitClient.ebayApiService.createOffer(
@@ -243,6 +253,24 @@ class QuiksaleViewModel : ViewModel() {
                 _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
             }
         }
+    }
+
+    private fun formatStartTime(text: String): String? {
+        if (text.isBlank()) return null
+        
+        // Einfache Logik: Nächster Donnerstag 18:00 Uhr UTC
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        while (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.THURSDAY) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        calendar.set(Calendar.HOUR_OF_DAY, 18)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(calendar.time)
     }
 
     private suspend fun uploadImagesToImgur(bitmaps: List<Bitmap>, imgurId: String): List<String> {
@@ -309,5 +337,9 @@ class QuiksaleViewModel : ViewModel() {
         if (currentState is QuiksaleUiState.Success) {
             _uiState.value = QuiksaleUiState.Success(newDraft)
         }
+    }
+
+    companion object {
+        private const val RECHTLICHER_HINWEIS = "<br><br><b>Rechtlicher Hinweis:</b> Es handelt sich um einen Privatverkauf. Der Verkauf erfolgt unter Ausschluss jeglicher Sachmängelhaftung. Die Haftung auf Schadenersatz wegen Verletzungen von Gesundheit, Körper oder Leben und grob fahrlässiger und/oder vorsätzlicher Verletzungen meiner Pflichten als Verkäufer bleibt davon unberührt. Keine Rücknahme."
     }
 }

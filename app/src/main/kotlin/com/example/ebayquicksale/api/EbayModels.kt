@@ -48,11 +48,13 @@ data class ShipToLocationAvailability(
 data class OfferRequest(
     val sku: String,
     val marketplaceId: String = "EBAY_DE",
-    val format: String = "FIXED_PRICE",
+    val format: String = "AUCTION",
+    val listingDuration: String = "DAYS_7",
     val pricingSummary: PricingSummary,
     val categoryId: String,
     val merchantLocationKey: String? = null,
-    val listingPolicies: ListingPolicies = ListingPolicies("DEFAULT", "DEFAULT", "DEFAULT")
+    val listingPolicies: ListingPolicies = ListingPolicies("DEFAULT", "DEFAULT", "DEFAULT"),
+    val scheduledStartTime: String? = null
 )
 
 data class PricingSummary(

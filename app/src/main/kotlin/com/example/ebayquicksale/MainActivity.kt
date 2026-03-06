@@ -112,6 +112,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     val ebayClientId by settingsManager.ebayClientId.collectAsState(initial = "")
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
+    val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
     
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
@@ -319,50 +320,60 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = { 
-                        ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
-                            if (validToken != null) {
-                                viewModel.uploadToEbay(
-                                    draft = draft,
-                                    bitmaps = capturedBitmaps,
-                                    token = validToken,
-                                    imgurId = imgurClientId,
-                                    defaultPrice = ebayStartPrice,
-                                    merchantLocation = merchantLocation,
-                                    paymentId = paymentPolicy,
-                                    fulfillmentId = fulfillmentPolicy,
-                                    returnId = returnPolicy
-                                )
-                            } else {
-                                Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
+                if (uploadState !is UploadUiState.Success) {
+                    Button(
+                        onClick = { 
+                            ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
+                                if (validToken != null) {
+                                    viewModel.uploadToEbay(
+                                        draft = draft,
+                                        bitmaps = capturedBitmaps,
+                                        token = validToken,
+                                        imgurId = imgurClientId,
+                                        defaultPrice = ebayStartPrice,
+                                        merchantLocation = merchantLocation,
+                                        paymentId = paymentPolicy,
+                                        fulfillmentId = fulfillmentPolicy,
+                                        returnId = returnPolicy,
+                                        startTimeText = ebayStartTime
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
+                                }
                             }
-                        }
-                    },
-                    enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && draft.categoryId.isNotBlank() && uploadState !is UploadUiState.Loading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
-                ) {
-                    if (uploadState is UploadUiState.Loading) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.onTertiary,
-                            modifier = Modifier.size(24.dp)
+                        },
+                        enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && draft.categoryId.isNotBlank() && uploadState !is UploadUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
                         )
-                    } else {
-                        Text("Als Entwurf zu eBay hochladen")
+                    ) {
+                        if (uploadState is UploadUiState.Loading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Text("Als Entwurf zu eBay hochladen")
+                        }
                     }
                 }
 
                 if (uploadState is UploadUiState.Loading) {
-                    Text(
-                        text = (uploadState as UploadUiState.Loading).message,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = (uploadState as UploadUiState.Loading).message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 if (draft.categoryId.isBlank() && ebayAccessToken != null) {
@@ -374,20 +385,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 }
 
                 when (uploadState) {
-                    is UploadUiState.Loading -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
-                        ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = (uploadState as UploadUiState.Loading).message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
                     is UploadUiState.Success -> {
                         val successState = uploadState as UploadUiState.Success
                         Column(
