@@ -304,14 +304,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                 if (validToken != null) {
                                     viewModel.uploadToEbay(
                                         draft = draft,
+                                        bitmaps = capturedBitmaps.toList(),
                                         token = validToken,
                                         defaultPrice = ebayStartPrice,
                                         merchantLocation = merchantLocation,
                                         paymentId = paymentPolicy,
                                         fulfillmentId = fulfillmentPolicy,
                                         returnId = returnPolicy
-                                    )
-                                } else {
+                                    )                                } else {
                                     Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
                                 }
                             }

@@ -7,11 +7,17 @@ import com.example.ebayquicksale.api.*
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 data class EbayDraft(
@@ -44,6 +50,9 @@ class QuiksaleViewModel : ViewModel() {
 
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
+
+    // Imgur Client ID (Hier später deine echte ID eintragen)
+    private val imgurClientId = "YOUR_IMGUR_CLIENT_ID"
 
     fun generateDraft(bitmaps: List<Bitmap>, notes: String, apiKey: String, ebayAccessToken: String?) {
         if (apiKey.isBlank()) {
@@ -90,7 +99,6 @@ class QuiksaleViewModel : ViewModel() {
                 val responseText = response.text
 
                 if (responseText != null) {
-                    // Markdown-Tags entfernen, falls vorhanden
                     val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
                     
                     val json = JSONObject(cleanJson)
@@ -102,7 +110,6 @@ class QuiksaleViewModel : ViewModel() {
                         condition = json.optString("condition", "USED_GOOD")
                     )
 
-                    // eBay Kategorie-Vorschläge abrufen, falls Token vorhanden
                     if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
                         try {
                             val ebayResponse = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
@@ -133,6 +140,7 @@ class QuiksaleViewModel : ViewModel() {
 
     fun uploadToEbay(
         draft: EbayDraft,
+        bitmaps: List<Bitmap>,
         token: String,
         defaultPrice: String,
         merchantLocation: String,
@@ -144,14 +152,21 @@ class QuiksaleViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                // 1. Bilder zu Imgur hochladen
+                val imageUrls = uploadImagesToImgur(bitmaps)
+                if (imageUrls.isEmpty()) {
+                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur.")
+                    return@launch
+                }
+
                 val sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8)
                 
-                // 1. Inventory Item erstellen
+                // 2. Inventory Item erstellen
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title,
                         description = draft.descriptionHtml,
-                        imageUris = listOf("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/1024px-No_image_available.svg.png")
+                        imageUris = imageUrls
                     ),
                     condition = draft.condition,
                     availability = Availability(
@@ -167,7 +182,7 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 if (inventoryResponse.isSuccessful) {
-                    // 2. Offer erstellen
+                    // 3. Offer erstellen
                     val priceValue = if (draft.suggestedPrice.isNotBlank()) {
                         draft.suggestedPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     } else {
@@ -207,6 +222,33 @@ class QuiksaleViewModel : ViewModel() {
                 _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
             }
         }
+    }
+
+    private suspend fun uploadImagesToImgur(bitmaps: List<Bitmap>): List<String> {
+        return bitmaps.map { bitmap ->
+            viewModelScope.async {
+                try {
+                    val stream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    val byteArray = stream.toByteArray()
+                    val requestBody = byteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                    val body = MultipartBody.Part.createFormData("image", "upload.jpg", requestBody)
+
+                    val response = ImgurRetrofitClient.imgurApiService.uploadImage(
+                        authorization = "Client-ID $imgurClientId",
+                        image = body
+                    )
+
+                    if (response.isSuccessful) {
+                        response.body()?.data?.link
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }.awaitAll().filterNotNull()
     }
 
     private fun parseEbayError(errorJson: String?): String {
