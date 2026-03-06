@@ -334,7 +334,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         isError = draft.condition.isBlank(),
                         supportingText = {
-                            if (draft.condition.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                            if (draft.condition.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                         }
                     )
                     ExposedDropdownMenu(
@@ -791,7 +791,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             placeholder = { Text("z.B. Berlin_12345") }
         )
 
-        // BLOCK 3: Tastatur-Optimierung für IDs
+        // SCHRITT 5: Tastatur-Optimierung
         OutlinedTextField(
             value = paymentPolicy,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
