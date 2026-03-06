@@ -181,8 +181,22 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                 CircularProgressIndicator()
             }
             is QuiksaleUiState.Success -> {
-                val html = (uiState as QuiksaleUiState.Success).htmlContent
-                Text("Generierter Entwurf:", style = MaterialTheme.typography.titleMedium)
+                val successState = uiState as QuiksaleUiState.Success
+                
+                Text("Vorschlag für eBay Titel:", style = MaterialTheme.typography.titleMedium)
+                SelectionContainer {
+                    Text(
+                        text = successState.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    )
+                }
+
+                Text("Generierte Beschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
                 SelectionContainer {
                     Surface(
                         modifier = Modifier
@@ -192,7 +206,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                         shape = MaterialTheme.shapes.medium
                     ) {
                         Text(
-                            text = html,
+                            text = successState.htmlContent,
                             modifier = Modifier
                                 .padding(8.dp)
                                 .verticalScroll(rememberScrollState()),
