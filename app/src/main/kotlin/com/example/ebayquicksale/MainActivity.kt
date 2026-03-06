@@ -30,10 +30,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -100,6 +102,7 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     val notes by viewModel.notes.collectAsState()
@@ -266,13 +269,40 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
                 
-                OutlinedTextField(
-                    value = draft.condition,
-                    onValueChange = { viewModel.updateDraft(draft.copy(condition = it)) },
-                    label = { Text("Zustand (z.B. USED_GOOD, NEW)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                // Dropdown für Artikelzustand
+                val conditions = listOf("NEW", "LIKE_NEW", "USED_EXCELLENT", "USED_GOOD", "USED_ACCEPTABLE", "FOR_PARTS_OR_NOT_WORKING")
+                var expanded by remember { mutableStateOf(false) }
+                
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = draft.condition,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Zustand") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        conditions.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption) },
+                                onClick = {
+                                    viewModel.updateDraft(draft.copy(condition = selectionOption))
+                                    expanded = false
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = draft.title,
@@ -320,44 +350,46 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (uploadState !is UploadUiState.Success) {
-                    Button(
-                        onClick = { 
-                            ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
-                                if (validToken != null) {
-                                    viewModel.uploadToEbay(
-                                        draft = draft,
-                                        bitmaps = capturedBitmaps,
-                                        token = validToken,
-                                        imgurId = imgurClientId,
-                                        defaultPrice = ebayStartPrice,
-                                        merchantLocation = merchantLocation,
-                                        paymentId = paymentPolicy,
-                                        fulfillmentId = fulfillmentPolicy,
-                                        returnId = returnPolicy,
-                                        startTimeText = ebayStartTime
-                                    )
-                                } else {
-                                    Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
-                                }
+                Button(
+                    onClick = { 
+                        ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
+                            if (validToken != null) {
+                                viewModel.uploadToEbay(
+                                    draft = draft,
+                                    bitmaps = capturedBitmaps,
+                                    token = validToken,
+                                    imgurId = imgurClientId,
+                                    defaultPrice = ebayStartPrice,
+                                    merchantLocation = merchantLocation,
+                                    paymentId = paymentPolicy,
+                                    fulfillmentId = fulfillmentPolicy,
+                                    returnId = returnPolicy,
+                                    startTimeText = ebayStartTime
+                                )
+                            } else {
+                                Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
                             }
-                        },
-                        enabled = ebayAccessToken != null && imgurClientId.isNotBlank() && draft.categoryId.isNotBlank() && uploadState !is UploadUiState.Loading,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiary
-                        )
-                    ) {
-                        if (uploadState is UploadUiState.Loading) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.onTertiary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else {
-                            Text("Als Entwurf zu eBay hochladen")
                         }
+                    },
+                    enabled = ebayAccessToken != null && 
+                             imgurClientId.isNotBlank() && 
+                             draft.categoryId.isNotBlank() && 
+                             draft.title.isNotBlank() && 
+                             uploadState !is UploadUiState.Loading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    if (uploadState is UploadUiState.Loading) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text("Als Entwurf zu eBay hochladen")
                     }
                 }
 
@@ -421,8 +453,9 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                     is UploadUiState.Error -> {
                         Text(
-                            (uploadState as UploadUiState.Error).message,
+                            text = (uploadState as UploadUiState.Error).message,
                             color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
@@ -447,6 +480,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 Text(
                     text = (uiState as QuiksaleUiState.Error).message,
                     color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
