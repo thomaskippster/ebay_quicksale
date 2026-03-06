@@ -3,7 +3,7 @@ package com.example.ebayquicksale
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.ebayquicksale.api.EbayRetrofitClient
+import com.example.ebayquicksale.api.*
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import com.google.ai.client.generativeai.type.generationConfig
@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.util.UUID
 
 data class EbayDraft(
     val title: String,
@@ -28,10 +29,20 @@ sealed interface QuiksaleUiState {
     data class Error(val message: String) : QuiksaleUiState
 }
 
+sealed interface UploadUiState {
+    object Idle : UploadUiState
+    object Loading : UploadUiState
+    object Success : UploadUiState
+    data class Error(val message: String) : UploadUiState
+}
+
 class QuiksaleViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<QuiksaleUiState>(QuiksaleUiState.Idle)
     val uiState: StateFlow<QuiksaleUiState> = _uiState.asStateFlow()
+
+    private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
+    val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
 
     fun generateDraft(bitmap: Bitmap, notes: String, apiKey: String, ebayAccessToken: String?) {
         if (apiKey.isBlank()) {
@@ -92,9 +103,6 @@ class QuiksaleViewModel : ViewModel() {
                                 draft = draft.copy(categoryId = firstCategory.categoryId)
                             }
                         } catch (e: Exception) {
-                            // Fehler beim Kategorie-Call loggen oder ignorieren, 
-                            // um den Gemini-Erfolg nicht zu blockieren.
-                            // Hier entscheiden wir uns für eine Fehlermeldung, falls der Token abgelaufen ist.
                             if (e.message?.contains("401") == true) {
                                 _uiState.value = QuiksaleUiState.Error("eBay Token abgelaufen. Bitte neu einloggen.")
                                 return@launch
@@ -110,5 +118,65 @@ class QuiksaleViewModel : ViewModel() {
                 _uiState.value = QuiksaleUiState.Error("Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
             }
         }
+    }
+
+    fun uploadToEbay(draft: EbayDraft, token: String, defaultPrice: String) {
+        _uploadState.value = UploadUiState.Loading
+
+        viewModelScope.launch {
+            try {
+                val sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8)
+                
+                // 1. Inventory Item erstellen
+                val inventoryRequest = InventoryItemRequest(
+                    product = Product(
+                        title = draft.title,
+                        description = draft.descriptionHtml
+                    )
+                )
+
+                val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(
+                    sku = sku,
+                    authorization = "Bearer $token",
+                    body = inventoryRequest
+                )
+
+                if (inventoryResponse.isSuccessful) {
+                    // 2. Offer erstellen
+                    val priceValue = if (draft.suggestedPrice.isNotBlank()) {
+                        draft.suggestedPrice.replace(Regex("[^0-9.]"), "")
+                    } else {
+                        defaultPrice
+                    }
+
+                    val offerRequest = OfferRequest(
+                        sku = sku,
+                        categoryId = draft.categoryId,
+                        pricingSummary = PricingSummary(
+                            price = Price(value = priceValue)
+                        )
+                    )
+
+                    val offerResponse = EbayRetrofitClient.ebayApiService.createOffer(
+                        authorization = "Bearer $token",
+                        body = offerRequest
+                    )
+
+                    if (offerResponse.isSuccessful) {
+                        _uploadState.value = UploadUiState.Success
+                    } else {
+                        _uploadState.value = UploadUiState.Error("Fehler beim Erstellen des Angebots: ${offerResponse.code()}")
+                    }
+                } else {
+                    _uploadState.value = UploadUiState.Error("Fehler beim Erstellen des Inventory Items: ${inventoryResponse.code()}")
+                }
+            } catch (e: Exception) {
+                _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
+            }
+        }
+    }
+    
+    fun resetUploadState() {
+        _uploadState.value = UploadUiState.Idle
     }
 }
