@@ -20,6 +20,7 @@ interface EbayApiService {
     suspend fun createOrReplaceInventoryItem(
         @Path("sku") sku: String,
         @Header("Authorization") authorization: String,
+        @Header("Content-Language") contentLanguage: String = "de-DE",
         @Body body: InventoryItemRequest
     ): retrofit2.Response<Unit>
 
@@ -29,6 +30,7 @@ interface EbayApiService {
     @POST("sell/inventory/v1/offer")
     suspend fun createOffer(
         @Header("Authorization") authorization: String,
+        @Header("Content-Language") contentLanguage: String = "de-DE",
         @Body body: OfferRequest
     ): retrofit2.Response<Map<String, String>>
 }
