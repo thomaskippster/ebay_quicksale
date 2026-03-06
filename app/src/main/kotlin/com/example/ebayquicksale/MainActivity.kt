@@ -89,14 +89,14 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
             startDestination = "main",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("main") { MainScreen(viewModel, settingsManager) }
+            composable("main") { MainScreen(viewModel, settingsManager, ebayAuthManager) }
             composable("settings") { SettingsScreen(settingsManager, ebayAuthManager) }
         }
     }
 }
 
 @Composable
-fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
+fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     var notes by remember { mutableStateOf("") }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
@@ -104,6 +104,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
+    val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     
     // New settings for upload
@@ -152,24 +153,26 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Button(
-            onClick = { 
-                when (PackageManager.PERMISSION_GRANTED) {
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
-                        val uri = createImageUri(context)
-                        photoUri = uri
-                        cameraLauncher.launch(uri)
+        if (capturedBitmap == null) {
+            Button(
+                onClick = { 
+                    when (PackageManager.PERMISSION_GRANTED) {
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
+                            val uri = createImageUri(context)
+                            photoUri = uri
+                            cameraLauncher.launch(uri)
+                        }
+                        else -> {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                     }
-                    else -> {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-        ) {
-            Text("Foto aufnehmen")
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text("Foto aufnehmen")
+            }
         }
 
         capturedBitmap?.let { bitmap ->
@@ -192,27 +195,34 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
             onValueChange = { notes = it },
             label = { Text("Mängel & Notizen") },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3
+            minLines = 3,
+            enabled = uiState !is QuiksaleUiState.Success
         )
 
-        Button(
-            onClick = { 
-                capturedBitmap?.let { 
-                    viewModel.generateDraft(it, notes, geminiApiKey, ebayAccessToken)
+        if (uiState !is QuiksaleUiState.Success) {
+            Button(
+                onClick = { 
+                    capturedBitmap?.let { 
+                        viewModel.generateDraft(it, notes, geminiApiKey, ebayAccessToken)
+                    }
+                },
+                enabled = capturedBitmap != null && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                if (uiState is QuiksaleUiState.Loading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Entwurf generieren")
                 }
-            },
-            enabled = capturedBitmap != null && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-        ) {
-            Text("Entwurf generieren")
+            }
         }
 
         // Status Anzeige
         when (uiState) {
             is QuiksaleUiState.Loading -> {
-                CircularProgressIndicator()
+                // Anzeige bereits im Button oder separat
             }
             is QuiksaleUiState.Success -> {
                 val draft = (uiState as QuiksaleUiState.Success).draft
@@ -278,52 +288,74 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = { 
-                        ebayAuthManager.getValidAccessToken(ebayClientSecret) { validToken ->
-                            if (validToken != null) {
-                                viewModel.uploadToEbay(
-                                    draft = draft,
-                                    token = validToken,
-                                    defaultPrice = ebayStartPrice,
-                                    merchantLocation = merchantLocation,
-                                    paymentId = paymentPolicy,
-                                    fulfillmentId = fulfillmentPolicy,
-                                    returnId = returnPolicy
-                                )
-                            } else {
-                                Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
+                if (uploadState !is UploadUiState.Success) {
+                    Button(
+                        onClick = { 
+                            ebayAuthManager.getValidAccessToken(ebayClientSecret) { validToken ->
+                                if (validToken != null) {
+                                    viewModel.uploadToEbay(
+                                        draft = draft,
+                                        token = validToken,
+                                        defaultPrice = ebayStartPrice,
+                                        merchantLocation = merchantLocation,
+                                        paymentId = paymentPolicy,
+                                        fulfillmentId = fulfillmentPolicy,
+                                        returnId = returnPolicy
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
+                                }
                             }
-                        }
-                    },
-                    enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
-                ) {
-                    if (uploadState is UploadUiState.Loading) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.onTertiary,
-                            modifier = Modifier.size(24.dp)
+                        },
+                        enabled = ebayAccessToken != null && uploadState !is UploadUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
                         )
-                    } else {
-                        Text("Als Entwurf zu eBay hochladen")
+                    ) {
+                        if (uploadState is UploadUiState.Loading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Text("Als Entwurf zu eBay hochladen")
+                        }
                     }
                 }
 
                 when (uploadState) {
                     is UploadUiState.Success -> {
-                        Text(
-                            "Erfolgreich als Entwurf hochgeladen! ✅",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            ),
-                            color = androidx.compose.ui.graphics.Color(0xFF2E7D32),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                "Erfolgreich als Entwurf hochgeladen! ✅",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                ),
+                                color = androidx.compose.ui.graphics.Color(0xFF2E7D32),
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            
+                            Button(
+                                onClick = {
+                                    notes = ""
+                                    capturedBitmap = null
+                                    photoUri = null
+                                    viewModel.resetAll()
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                            ) {
+                                Text("Nächsten Artikel scannen")
+                            }
+                        }
                     }
                     is UploadUiState.Error -> {
                         Text(

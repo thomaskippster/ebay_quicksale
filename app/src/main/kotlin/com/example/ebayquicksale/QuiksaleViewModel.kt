@@ -225,4 +225,9 @@ class QuiksaleViewModel : ViewModel() {
     fun resetUploadState() {
         _uploadState.value = UploadUiState.Idle
     }
+
+    fun resetAll() {
+        _uiState.value = QuiksaleUiState.Idle
+        _uploadState.value = UploadUiState.Idle
+    }
 }
