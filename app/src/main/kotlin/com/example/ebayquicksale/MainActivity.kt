@@ -350,7 +350,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     singleLine = true,
                     isError = draft.title.isBlank(),
                     supportingText = {
-                        if (draft.title.isBlank()) Text("Titel darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+                        if (draft.title.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
                     }
                 )
 
@@ -368,7 +368,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         singleLine = true,
                         isError = draft.suggestedPrice.isBlank(),
                         supportingText = {
-                            if (draft.suggestedPrice.isBlank()) Text("Preis fehlt", color = MaterialTheme.colorScheme.error)
+                            if (draft.suggestedPrice.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
                         }
                     )
                     OutlinedTextField(
@@ -381,7 +381,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = draft.categoryId.isBlank(),
                         supportingText = {
-                            if (draft.categoryId.isBlank()) Text("Kategorie fehlt", color = MaterialTheme.colorScheme.error)
+                            if (draft.categoryId.isBlank()) Text("Dieses Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
                         }
                     )
                 }
