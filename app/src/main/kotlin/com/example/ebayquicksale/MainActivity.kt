@@ -120,7 +120,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
-    val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
+    val defaultListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
     
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
@@ -250,7 +250,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         if (uiState !is QuiksaleUiState.Success) {
             Button(
                 onClick = { 
-                    viewModel.generateDraft(geminiApiKey, ebayAccessToken)
+                    viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat)
                 },
                 enabled = capturedBitmaps.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
                 modifier = Modifier
@@ -309,6 +309,36 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                 contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                             )
                         }
+                    }
+                }
+
+                // Listing Format Selection
+                Row(
+                    modifier = Modifier.fillMaxWidth().selectableGroup(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.selectable(
+                            selected = (draft.listingFormat == "AUCTION"),
+                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "AUCTION")) },
+                            role = Role.RadioButton
+                        )
+                    ) {
+                        RadioButton(selected = (draft.listingFormat == "AUCTION"), onClick = null)
+                        Text("Auktion", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.selectable(
+                            selected = (draft.listingFormat == "FIXED_PRICE"),
+                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "FIXED_PRICE")) },
+                            role = Role.RadioButton
+                        )
+                    ) {
+                        RadioButton(selected = (draft.listingFormat == "FIXED_PRICE"), onClick = null)
+                        Text("Festpreis", modifier = Modifier.padding(start = 8.dp))
                     }
                 }
 
@@ -384,8 +414,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                     paymentId = paymentPolicy,
                                     fulfillmentId = fulfillmentPolicy,
                                     returnId = returnPolicy,
-                                    startTimeText = ebayStartTime,
-                                    listingFormat = ebayListingFormat
+                                    startTimeText = ebayStartTime
                                 )
                             } else {
                                 Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()

@@ -28,7 +28,8 @@ data class EbayDraft(
     val categoryKeywords: String,
     val categoryId: String = "",
     val condition: String = "USED_GOOD",
-    val sku: String = ""
+    val sku: String = "",
+    val listingFormat: String = "AUCTION"
 )
 
 sealed interface QuiksaleUiState {
@@ -71,7 +72,7 @@ class QuiksaleViewModel : ViewModel() {
         _bitmaps.value = _bitmaps.value - bitmap
     }
 
-    fun generateDraft(apiKey: String, ebayAccessToken: String?) {
+    fun generateDraft(apiKey: String, ebayAccessToken: String?, defaultListingFormat: String) {
         val currentBitmaps = _bitmaps.value
         val currentNotes = _notes.value
 
@@ -138,7 +139,8 @@ class QuiksaleViewModel : ViewModel() {
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
                         condition = json.optString("condition", "USED_GOOD"),
-                        sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8)
+                        sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8),
+                        listingFormat = defaultListingFormat
                     )
 
                     if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
@@ -179,8 +181,7 @@ class QuiksaleViewModel : ViewModel() {
         paymentId: String,
         fulfillmentId: String,
         returnId: String,
-        startTimeText: String,
-        listingFormat: String
+        startTimeText: String
     ) {
         viewModelScope.launch {
             try {
@@ -223,14 +224,14 @@ class QuiksaleViewModel : ViewModel() {
                         defaultPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     }
 
-                    val duration = if (listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
+                    val duration = if (draft.listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
                     // Startzeit nur bei Auktionen nutzen
-                    val scheduledTime = if (listingFormat == "AUCTION") formatStartTime(startTimeText) else null
+                    val scheduledTime = if (draft.listingFormat == "AUCTION") formatStartTime(startTimeText) else null
 
                     val offerRequest = OfferRequest(
                         sku = draft.sku,
                         categoryId = draft.categoryId,
-                        format = listingFormat,
+                        format = draft.listingFormat,
                         listingDuration = duration,
                         pricingSummary = PricingSummary(
                             price = Price(value = priceValue)
