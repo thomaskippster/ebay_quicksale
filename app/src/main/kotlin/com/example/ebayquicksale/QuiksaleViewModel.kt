@@ -26,7 +26,8 @@ data class EbayDraft(
     val suggestedPrice: String,
     val categoryKeywords: String,
     val categoryId: String = "",
-    val condition: String = "USED_GOOD"
+    val condition: String = "USED_GOOD",
+    val sku: String = ""
 )
 
 sealed interface QuiksaleUiState {
@@ -38,7 +39,7 @@ sealed interface QuiksaleUiState {
 
 sealed interface UploadUiState {
     object Idle : UploadUiState
-    object Loading : UploadUiState
+    data class Loading(val message: String) : UploadUiState
     object Success : UploadUiState
     data class Error(val message: String) : UploadUiState
 }
@@ -125,7 +126,8 @@ class QuiksaleViewModel : ViewModel() {
                         descriptionHtml = json.optString("description_html", ""),
                         suggestedPrice = json.optString("suggested_price", "1.00"),
                         categoryKeywords = json.optString("category_keywords", ""),
-                        condition = json.optString("condition", "USED_GOOD")
+                        condition = json.optString("condition", "USED_GOOD"),
+                        sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8)
                     )
 
                     if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
@@ -167,20 +169,18 @@ class QuiksaleViewModel : ViewModel() {
         fulfillmentId: String,
         returnId: String
     ) {
-        _uploadState.value = UploadUiState.Loading
-
         viewModelScope.launch {
             try {
                 // 1. Bilder zu Imgur hochladen
+                _uploadState.value = UploadUiState.Loading("Bilder werden zu Imgur hochladen...")
                 val imageUrls = uploadImagesToImgur(bitmaps, imgurId)
                 if (imageUrls.isEmpty()) {
                     _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu Imgur. Prüfe die Imgur Client ID.")
                     return@launch
                 }
 
-                val sku = "QUIKSALE-" + UUID.randomUUID().toString().take(8)
-                
                 // 2. Inventory Item erstellen
+                _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird bei eBay erstellt...")
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title,
@@ -195,13 +195,14 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(
-                    sku = sku,
+                    sku = draft.sku,
                     authorization = "Bearer $token",
                     body = inventoryRequest
                 )
 
                 if (inventoryResponse.isSuccessful) {
                     // 3. Offer erstellen
+                    _uploadState.value = UploadUiState.Loading("eBay Angebot wird generiert...")
                     val priceValue = if (draft.suggestedPrice.isNotBlank()) {
                         draft.suggestedPrice.replace(",", ".").replace(Regex("[^0-9.]"), "")
                     } else {
@@ -209,7 +210,7 @@ class QuiksaleViewModel : ViewModel() {
                     }
 
                     val offerRequest = OfferRequest(
-                        sku = sku,
+                        sku = draft.sku,
                         categoryId = draft.categoryId,
                         pricingSummary = PricingSummary(
                             price = Price(value = priceValue)
