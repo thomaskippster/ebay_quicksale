@@ -119,7 +119,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
-    val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
     val defaultListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
     
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
@@ -464,7 +463,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                     draft = draft,
                                     bitmaps = capturedBitmaps,
                                     token = validToken,
-                                    imgurId = imgurClientId,
                                     defaultPrice = ebayStartPrice,
                                     merchantLocation = merchantLocation,
                                     paymentId = paymentPolicy,
@@ -478,7 +476,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         }
                     },
                     enabled = ebayAccessToken != null && 
-                             imgurClientId.isNotBlank() && 
                              draft.categoryId.isNotBlank() && 
                              draft.title.isNotBlank() && 
                              draft.suggestedPrice.isNotBlank() &&
@@ -594,12 +591,6 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
-                } else if (imgurClientId.isBlank()) {
-                    Text(
-                        "Bitte trage deine Imgur Client ID in den Einstellungen ein.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
                 }
             }
             is QuiksaleUiState.Error -> {
@@ -651,7 +642,6 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
-    val imgurClientId by settingsManager.imgurClientId.collectAsState(initial = "")
     val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
 
     val isFetchingSettings by viewModel.isFetchingSettings.collectAsState()
@@ -680,20 +670,13 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     ) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
 
-        Text("Gemini & Imgur Konfiguration", style = MaterialTheme.typography.titleMedium)
+        Text("Gemini Konfiguration", style = MaterialTheme.typography.titleMedium)
         SafeTextField(
             value = geminiApiKey,
             onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
             label = "Gemini API Key",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-        )
-
-        SafeTextField(
-            value = imgurClientId,
-            onValueChange = { coroutineScope.launch { settingsManager.saveImgurClientId(it) } },
-            label = "Imgur Client ID",
-            modifier = Modifier.fillMaxWidth()
         )
 
         HorizontalDivider()
