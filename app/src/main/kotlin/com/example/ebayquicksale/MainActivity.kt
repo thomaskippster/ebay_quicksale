@@ -313,6 +313,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     
+    // Collect all five settings as state
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
@@ -344,8 +345,19 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     ) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
 
+        Text("Gemini Konfiguration", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = geminiApiKey,
+            onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
+            label = { Text("Gemini API Key") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+
+        HorizontalDivider()
+
         Text("eBay Developer Credentials", style = MaterialTheme.typography.titleMedium)
-        
         OutlinedTextField(
             value = ebayClientId,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } },
@@ -376,15 +388,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 
         HorizontalDivider()
 
-        OutlinedTextField(
-            value = geminiApiKey,
-            onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } },
-            label = { Text("Gemini API Key") },
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-        )
-
+        Text("eBay Standard-Angebotsdaten", style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = ebayStartPrice,
             onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartPrice(it) } },
