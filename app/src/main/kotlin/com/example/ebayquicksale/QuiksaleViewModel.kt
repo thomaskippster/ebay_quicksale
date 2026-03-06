@@ -297,4 +297,11 @@ class QuiksaleViewModel : ViewModel() {
         _notes.value = ""
         _bitmaps.value = emptyList()
     }
+
+    fun updateDraft(newDraft: EbayDraft) {
+        val currentState = _uiState.value
+        if (currentState is QuiksaleUiState.Success) {
+            _uiState.value = QuiksaleUiState.Success(newDraft)
+        }
+    }
 }

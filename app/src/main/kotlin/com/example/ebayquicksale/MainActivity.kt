@@ -245,30 +245,27 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     color = MaterialTheme.colorScheme.secondary
                 )
 
-                Text("Vorschlag für eBay Titel:", style = MaterialTheme.typography.titleMedium)
-                SelectionContainer {
-                    Text(
-                        text = draft.title,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                        ),
-                        modifier = Modifier.fillMaxWidth().padding(4.dp)
-                    )
-                }
+                OutlinedTextField(
+                    value = draft.title,
+                    onValueChange = { viewModel.updateDraft(draft.copy(title = it.take(80))) },
+                    label = { Text("eBay Titel (max. 80 Zeichen)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("Empfohlener Preis:", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            text = if (draft.suggestedPrice.contains("€")) draft.suggestedPrice else "${draft.suggestedPrice} €",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    OutlinedTextField(
+                        value = draft.suggestedPrice,
+                        onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it)) },
+                        label = { Text("Preis (€)") },
+                        modifier = Modifier.width(120.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Kategorie ID:", style = MaterialTheme.typography.titleSmall)
                         Text(
@@ -278,25 +275,17 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
-                Text("Generierte Beschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
-                SelectionContainer {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Text(
-                            text = draft.descriptionHtml,
-                            modifier = Modifier
-                                .padding(8.dp)
-                                .verticalScroll(rememberScrollState()),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+                Text("Artikelbeschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = draft.descriptionHtml,
+                    onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 200.dp, max = 400.dp),
+                    label = { Text("HTML Code") },
+                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    minLines = 5
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
