@@ -654,36 +654,42 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 
         HorizontalDivider()
 
-        Text("eBay Marktplatz & Format", style = MaterialTheme.typography.titleMedium)
-        
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
-            Column(modifier = Modifier.selectableGroup().padding(8.dp)) {
-                val options = listOf("AUCTION", "FIXED_PRICE")
-                options.forEach { text ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .selectable(
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "Standard eBay-Format",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                Column(modifier = Modifier.selectableGroup()) {
+                    val options = listOf("AUCTION", "FIXED_PRICE")
+                    options.forEach { text ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .selectable(
+                                    selected = (text == ebayListingFormat),
+                                    onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(text) } },
+                                    role = Role.RadioButton
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
                                 selected = (text == ebayListingFormat),
-                                onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(text) } },
-                                role = Role.RadioButton
+                                onClick = null
                             )
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (text == ebayListingFormat),
-                            onClick = null
-                        )
-                        Text(
-                            text = if (text == "AUCTION") "Auktion" else "Festpreis",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp)
-                        )
+                            Text(
+                                text = if (text == "AUCTION") "Auktion" else "Festpreis",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 16.dp)
+                            )
+                        }
                     }
                 }
             }
