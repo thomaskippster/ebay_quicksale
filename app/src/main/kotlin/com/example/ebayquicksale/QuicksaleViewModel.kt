@@ -206,7 +206,7 @@ class QuicksaleViewModel : ViewModel() {
                             .trim()
                             .replace(Regex("^\\s*[*\\-]\\s+"), "")
 
-                        val legalNotice = kotlinx.coroutines.flow.first(settingsManager.defaultLegalNotice)
+                        val legalNotice = settingsManager.defaultLegalNotice.first()
                         if (legalNotice.isNotBlank()) {
                             htmlDesc += "<br><br><b>Rechtlicher Hinweis:</b> $legalNotice"
                         } else {
