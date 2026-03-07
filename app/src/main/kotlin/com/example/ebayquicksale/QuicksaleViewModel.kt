@@ -450,6 +450,7 @@ class QuicksaleViewModel : ViewModel() {
                     )
 
                     val responseBody = EbayRetrofitClient.ebayApiService.uploadPicture(
+                        authorization = "Bearer $token",
                         xmlRequest = xmlPart,
                         picture = imagePart
                     ).string()
