@@ -43,6 +43,42 @@ object ImageUtils {
     /**
      * Löscht alle temporären Bilder aus dem Cache-Verzeichnis, die mit "JPEG_" beginnen.
      */
+    /**
+     * Speichert ein Bitmap im internen Speicher der App und gibt den absoluten Pfad zurück.
+     */
+    fun saveBitmapToInternalStorage(context: Context, bitmap: Bitmap): String? {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmssSSS", Locale.getDefault()).format(Date())
+        val fileName = "QS_IMG_$timeStamp.jpg"
+        val file = File(context.filesDir, fileName)
+        
+        return try {
+            val stream = FileOutputStream(file)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+            stream.flush()
+            stream.close()
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Löscht alle von der App im internen Speicher erstellten Bilder.
+     */
+    fun clearInternalImageStorage(context: Context) {
+        try {
+            val files = context.filesDir.listFiles()
+            files?.forEach { file ->
+                if (file.name.startsWith("QS_IMG_")) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun clearImageCache(context: Context) {
         try {
             val cacheDir = context.cacheDir

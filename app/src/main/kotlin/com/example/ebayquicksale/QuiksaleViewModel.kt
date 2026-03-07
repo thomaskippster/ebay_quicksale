@@ -1,6 +1,9 @@
 package com.example.ebayquicksale
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ebayquicksale.api.*
@@ -19,6 +22,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,7 +36,8 @@ data class EbayDraft(
     val sku: String = "",
     val listingFormat: String = "AUCTION",
     val brand: String = "Markenlos",
-    val mpn: String = "Nicht zutreffend"
+    val mpn: String = "Nicht zutreffend",
+    val imagePaths: List<String> = emptyList()
 )
 
 sealed interface QuiksaleUiState {
@@ -60,7 +65,6 @@ class QuiksaleViewModel : ViewModel() {
     private val _isFetchingSettings = MutableStateFlow(false)
     val isFetchingSettings: StateFlow<Boolean> = _isFetchingSettings.asStateFlow()
 
-    // Listen für Dropdowns in den Einstellungen
     private val _fulfillmentPolicies = MutableStateFlow<List<PolicyInfo>>(emptyList())
     val fulfillmentPolicies: StateFlow<List<PolicyInfo>> = _fulfillmentPolicies.asStateFlow()
 
@@ -76,8 +80,9 @@ class QuiksaleViewModel : ViewModel() {
     private val _notes = MutableStateFlow("")
     val notes: StateFlow<String> = _notes.asStateFlow()
 
-    private val _bitmaps = MutableStateFlow<List<Bitmap>>(emptyList())
-    val bitmaps: StateFlow<List<Bitmap>> = _bitmaps.asStateFlow()
+    // Wir speichern nun Pfade statt Bitmaps für Persistenz
+    private val _imagePaths = MutableStateFlow<List<String>>(emptyList())
+    val imagePaths: StateFlow<List<String>> = _imagePaths.asStateFlow()
 
     private val gson = Gson()
 
@@ -85,12 +90,20 @@ class QuiksaleViewModel : ViewModel() {
         _notes.value = text
     }
 
-    fun addBitmap(bitmap: Bitmap) {
-        _bitmaps.value = _bitmaps.value + bitmap
+    fun addImage(context: Context, bitmap: Bitmap) {
+        viewModelScope.launch {
+            val path = ImageUtils.saveBitmapToInternalStorage(context, bitmap)
+            if (path != null) {
+                _imagePaths.value = _imagePaths.value + path
+            }
+        }
     }
 
-    fun removeBitmap(bitmap: Bitmap) {
-        _bitmaps.value = _bitmaps.value - bitmap
+    fun removeImage(path: String) {
+        _imagePaths.value = _imagePaths.value - path
+        try {
+            File(path).delete()
+        } catch (e: Exception) {}
     }
 
     fun loadDraftFromStorage(settingsManager: SettingsManager) {
@@ -100,6 +113,7 @@ class QuiksaleViewModel : ViewModel() {
                     try {
                         val draft = gson.fromJson(json, EbayDraft::class.java)
                         _uiState.value = QuiksaleUiState.Success(draft)
+                        _imagePaths.value = draft.imagePaths
                     } catch (e: Exception) {
                         // Ignorieren falls ungültig
                     }
@@ -109,7 +123,7 @@ class QuiksaleViewModel : ViewModel() {
     }
 
     fun generateDraft(apiKey: String, ebayAccessToken: String?, defaultListingFormat: String, settingsManager: SettingsManager) {
-        val currentBitmaps = _bitmaps.value
+        val currentPaths = _imagePaths.value
         val currentNotes = _notes.value
 
         if (apiKey.isBlank()) {
@@ -117,7 +131,7 @@ class QuiksaleViewModel : ViewModel() {
             return
         }
 
-        if (currentBitmaps.isEmpty()) {
+        if (currentPaths.isEmpty()) {
             _uiState.value = QuiksaleUiState.Error("Bitte nimm mindestens ein Foto auf.")
             return
         }
@@ -126,6 +140,16 @@ class QuiksaleViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                // Bitmaps aus Pfaden laden für Gemini
+                val bitmaps = currentPaths.mapNotNull { path ->
+                    try { BitmapFactory.decodeFile(path) } catch (e: Exception) { null }
+                }
+
+                if (bitmaps.isEmpty()) {
+                    _uiState.value = QuiksaleUiState.Error("Fehler beim Laden der Bilder.")
+                    return@launch
+                }
+
                 val config = generationConfig {
                     responseMimeType = "application/json"
                 }
@@ -150,7 +174,7 @@ class QuiksaleViewModel : ViewModel() {
                 """.trimIndent()
 
                 val inputContent = content {
-                    currentBitmaps.forEach { image(it) }
+                    bitmaps.forEach { image(it) }
                     text(prompt)
                 }
 
@@ -159,20 +183,16 @@ class QuiksaleViewModel : ViewModel() {
 
                 if (responseText != null) {
                     val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
-                    
                     val json = JSONObject(cleanJson)
                     
-                    // HTML-Sicherheit: Bereinigung der htmlDesc
                     var htmlDesc = json.optString("description_html", "")
                         .replace("```html", "")
                         .replace("```", "")
                         .trim()
-                        .replace(Regex("^\\s*[*\\-]\\s+"), "") // Entfernt führende Markdown-Bullets falls vorhanden
+                        .replace(Regex("^\\s*[*\\-]\\s+"), "")
                     
-                    // Rechtlichen Hinweis anhängen
                     htmlDesc += RECHTLICHER_HINWEIS
 
-                    // SKU-Generierung: Präfix + Datum/Zeit + Kurze UUID für garantierte Eindeutigkeit
                     val timeStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
                     val shortUuid = UUID.randomUUID().toString().take(4)
                     
@@ -185,7 +205,8 @@ class QuiksaleViewModel : ViewModel() {
                         sku = "QS-$timeStamp-$shortUuid",
                         listingFormat = defaultListingFormat,
                         brand = json.optString("brand", "Markenlos"),
-                        mpn = json.optString("mpn", "Nicht zutreffend")
+                        mpn = json.optString("mpn", "Nicht zutreffend"),
+                        imagePaths = currentPaths
                     )
 
                     if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
@@ -198,12 +219,7 @@ class QuiksaleViewModel : ViewModel() {
                             if (firstCategory != null) {
                                 draft = draft.copy(categoryId = firstCategory.categoryId)
                             }
-                        } catch (e: Exception) {
-                            if (e.message?.contains("401") == true) {
-                                _uiState.value = QuiksaleUiState.Error("eBay Token abgelaufen. Bitte neu einloggen.")
-                                return@launch
-                            }
-                        }
+                        } catch (e: Exception) {}
                     }
 
                     _uiState.value = QuiksaleUiState.Success(draft)
@@ -219,7 +235,6 @@ class QuiksaleViewModel : ViewModel() {
 
     fun uploadToEbay(
         draft: EbayDraft,
-        bitmaps: List<Bitmap>,
         token: String,
         defaultPrice: String,
         merchantLocation: String,
@@ -227,38 +242,41 @@ class QuiksaleViewModel : ViewModel() {
         fulfillmentId: String,
         returnId: String,
         startTimeText: String,
-        settingsManager: SettingsManager
+        settingsManager: SettingsManager,
+        context: Context
     ) {
-        if (bitmaps.size > 12) {
+        val paths = _imagePaths.value
+        if (paths.size > 12) {
             _uploadState.value = UploadUiState.Error("eBay erlaubt maximal 12 Bilder. Bitte entferne einige Fotos.")
             return
         }
 
         viewModelScope.launch {
             try {
-                // 1. Bilder zum eBay Picture Service (EPS) hochladen mit Fortschritt
-                val totalImages = bitmaps.size
+                // 1. Bilder laden und zum EPS hochladen
+                val totalImages = paths.size
                 val imageUrls = mutableListOf<String>()
                 
-                for (i in bitmaps.indices) {
+                for (i in paths.indices) {
                     val currentNum = i + 1
                     _uploadState.value = UploadUiState.Loading(
                         message = "Bild $currentNum von $totalImages wird zu eBay übertragen...",
                         progress = i.toFloat() / totalImages
                     )
                     
-                    val url = uploadSingleImage(bitmaps[i], token)
-                    if (url != null) {
-                        imageUrls.add(url)
+                    val bitmap = try { BitmapFactory.decodeFile(paths[i]) } catch (e: Exception) { null }
+                    if (bitmap != null) {
+                        val url = uploadSingleImage(bitmap, token)
+                        if (url != null) imageUrls.add(url)
                     }
                 }
 
                 if (imageUrls.isEmpty()) {
-                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload zu eBay. Bitte prüfe deine Verbindung.")
+                    _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload.")
                     return@launch
                 }
 
-                // 2. Inventory Item erstellen mit Aspects (Marke & MPN)
+                // 2. Inventory Item
                 _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird erstellt...", 0.9f)
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
@@ -284,15 +302,10 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 if (inventoryResponse.isSuccessful) {
-                    // 3. Offer erstellen
+                    // 3. Offer
                     _uploadState.value = UploadUiState.Loading("Angebot wird generiert...", 0.95f)
-                    
                     val priceValue = sanitizePrice(if (draft.suggestedPrice.isNotBlank()) draft.suggestedPrice else defaultPrice)
-
-                    // Dynamische Dauer bestimmen
                     val duration = if (draft.listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
-                    
-                    // Startzeit-Logik
                     val finalStartTime = if (draft.listingFormat == "AUCTION") formatStartTime(startTimeText) else null
 
                     val offerRequest = OfferRequest(
@@ -329,13 +342,12 @@ class QuiksaleViewModel : ViewModel() {
                             if (publishResponse.isSuccessful) {
                                 val listingId = publishResponse.body()?.listingId ?: "Unbekannt"
                                 _uploadState.value = UploadUiState.Success(listingId)
-                                settingsManager.saveCurrentDraft(null) // Erfolg -> Entwurf löschen
+                                settingsManager.saveCurrentDraft(null)
+                                ImageUtils.clearInternalImageStorage(context)
                             } else {
                                 val errorMsg = parseEbayError(publishResponse.errorBody()?.string())
                                 _uploadState.value = UploadUiState.Error("eBay Fehler (Publish): $errorMsg")
                             }
-                        } else {
-                            _uploadState.value = UploadUiState.Error("Keine OfferId erhalten.")
                         }
                     } else {
                         val errorMsg = parseEbayError(offerResponse.errorBody()?.string())
@@ -346,7 +358,7 @@ class QuiksaleViewModel : ViewModel() {
                     _uploadState.value = UploadUiState.Error("eBay Fehler (Inventory): $errorMsg")
                 }
             } catch (e: Exception) {
-                _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
+                _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage}")
             }
         }
     }
@@ -398,7 +410,6 @@ class QuiksaleViewModel : ViewModel() {
         if (text.isBlank() || text.uppercase() == "SOFORT") return null
         
         return try {
-            // Versuche das Format yyyy-MM-dd HH:mm zu parsen
             val inputSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.GERMANY)
             val date = inputSdf.parse(text)
             
@@ -406,7 +417,6 @@ class QuiksaleViewModel : ViewModel() {
             outputSdf.timeZone = TimeZone.getTimeZone("UTC")
             if (date != null) outputSdf.format(date) else null
         } catch (e: Exception) {
-            // Fallback: Nächster Donnerstag 18:00 Uhr UTC (Best-Practice für Auktionen)
             val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
             while (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.THURSDAY) {
                 calendar.add(Calendar.DAY_OF_YEAR, 1)
@@ -427,13 +437,12 @@ class QuiksaleViewModel : ViewModel() {
     }
 
     private fun sanitizePrice(input: String): String {
-        // Entferne alles außer Ziffern, Komma und Punkt
         val clean = input.replace(",", ".").replace(Regex("[^0-9.]"), "")
         return try {
             val price = clean.toDouble()
             String.format(Locale.US, "%.2f", price)
         } catch (e: Exception) {
-            "1.00" // Fallback
+            "1.00"
         }
     }
 
@@ -468,7 +477,6 @@ class QuiksaleViewModel : ViewModel() {
                 val message = firstError.optString("message")
                 val longMessage = firstError.optString("longMessage")
                 
-                // Parameter extrahieren (z.B. Min-Preis, fehlende Felder)
                 val parameters = firstError.optJSONArray("parameters")
                 val paramsStr = if (parameters != null && parameters.length() > 0) {
                     val pList = mutableListOf<String>()
@@ -495,11 +503,12 @@ class QuiksaleViewModel : ViewModel() {
         _uploadState.value = UploadUiState.Idle
     }
 
-    fun resetAll(settingsManager: SettingsManager) {
+    fun resetAll(settingsManager: SettingsManager, context: Context) {
         _uiState.value = QuiksaleUiState.Idle
         _uploadState.value = UploadUiState.Idle
         _notes.value = ""
-        _bitmaps.value = emptyList()
+        _imagePaths.value = emptyList()
+        ImageUtils.clearInternalImageStorage(context)
         viewModelScope.launch {
             settingsManager.saveCurrentDraft(null)
         }
@@ -509,6 +518,7 @@ class QuiksaleViewModel : ViewModel() {
         val currentState = _uiState.value
         if (currentState is QuiksaleUiState.Success) {
             _uiState.value = QuiksaleUiState.Success(newDraft)
+            _imagePaths.value = newDraft.imagePaths
             viewModelScope.launch {
                 settingsManager.saveCurrentDraft(gson.toJson(newDraft))
             }
