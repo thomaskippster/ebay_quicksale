@@ -27,6 +27,21 @@ class SettingsManager(private val context: Context) {
         val EBAY_RETURN_POLICY = stringPreferencesKey("ebay_return_policy")
         val EBAY_LISTING_FORMAT = stringPreferencesKey("ebay_listing_format")
         val CURRENT_DRAFT_JSON = stringPreferencesKey("current_draft_json")
+        val EBAY_AUTH_STATE = stringPreferencesKey("ebay_auth_state_json")
+    }
+
+    val ebayAuthState: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_AUTH_STATE]
+    }
+
+    suspend fun saveEbayAuthState(json: String?) {
+        context.dataStore.edit { preferences ->
+            if (json == null) {
+                preferences.remove(EBAY_AUTH_STATE)
+            } else {
+                preferences[EBAY_AUTH_STATE] = json
+            }
+        }
     }
 
     val currentDraftJson: Flow<String?> = context.dataStore.data.map { preferences ->

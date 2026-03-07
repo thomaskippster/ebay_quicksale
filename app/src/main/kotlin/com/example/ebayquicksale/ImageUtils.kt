@@ -3,6 +3,10 @@ package com.example.ebayquicksale
 import android.content.Context
 import android.graphics.Bitmap
 import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object ImageUtils {
     /**

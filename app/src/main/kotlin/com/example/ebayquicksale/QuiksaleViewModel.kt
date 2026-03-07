@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -80,7 +82,6 @@ class QuiksaleViewModel : ViewModel() {
     private val _notes = MutableStateFlow("")
     val notes: StateFlow<String> = _notes.asStateFlow()
 
-    // Wir speichern nun Pfade statt Bitmaps für Persistenz
     private val _imagePaths = MutableStateFlow<List<String>>(emptyList())
     val imagePaths: StateFlow<List<String>> = _imagePaths.asStateFlow()
 
@@ -114,9 +115,7 @@ class QuiksaleViewModel : ViewModel() {
                         val draft = gson.fromJson(json, EbayDraft::class.java)
                         _uiState.value = QuiksaleUiState.Success(draft)
                         _imagePaths.value = draft.imagePaths
-                    } catch (e: Exception) {
-                        // Ignorieren falls ungültig
-                    }
+                    } catch (e: Exception) {}
                 }
             }
         }
@@ -140,7 +139,6 @@ class QuiksaleViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // Bitmaps aus Pfaden laden für Gemini
                 val bitmaps = currentPaths.mapNotNull { path ->
                     try { BitmapFactory.decodeFile(path) } catch (e: Exception) { null }
                 }
@@ -182,48 +180,52 @@ class QuiksaleViewModel : ViewModel() {
                 val responseText = response.text
 
                 if (responseText != null) {
-                    val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
-                    val json = JSONObject(cleanJson)
-                    
-                    var htmlDesc = json.optString("description_html", "")
-                        .replace("```html", "")
-                        .replace("```", "")
-                        .trim()
-                        .replace(Regex("^\\s*[*\\-]\\s+"), "")
-                    
-                    htmlDesc += RECHTLICHER_HINWEIS
+                    try {
+                        val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
+                        val json = JSONObject(cleanJson)
+                        
+                        var htmlDesc = json.optString("description_html", "")
+                            .replace("```html", "")
+                            .replace("```", "")
+                            .trim()
+                            .replace(Regex("^\\s*[*\\-]\\s+"), "")
+                        
+                        htmlDesc += RECHTLICHER_HINWEIS
 
-                    val timeStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
-                    val shortUuid = UUID.randomUUID().toString().take(4)
-                    
-                    var draft = EbayDraft(
-                        title = json.optString("title", "Kein Titel"),
-                        descriptionHtml = htmlDesc,
-                        suggestedPrice = json.optString("suggested_price", "1.00"),
-                        categoryKeywords = json.optString("category_keywords", ""),
-                        condition = json.optString("condition", "USED_GOOD"),
-                        sku = "QS-$timeStamp-$shortUuid",
-                        listingFormat = defaultListingFormat,
-                        brand = json.optString("brand", "Markenlos"),
-                        mpn = json.optString("mpn", "Nicht zutreffend"),
-                        imagePaths = currentPaths
-                    )
+                        val timeStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+                        val shortUuid = UUID.randomUUID().toString().take(4)
+                        
+                        var draft = EbayDraft(
+                            title = json.optString("title", "Kein Titel"),
+                            descriptionHtml = htmlDesc,
+                            suggestedPrice = json.optString("suggested_price", "1.00"),
+                            categoryKeywords = json.optString("category_keywords", ""),
+                            condition = json.optString("condition", "USED_GOOD"),
+                            sku = "QS-$timeStamp-$shortUuid",
+                            listingFormat = defaultListingFormat,
+                            brand = json.optString("brand", "Markenlos"),
+                            mpn = json.optString("mpn", "Nicht zutreffend"),
+                            imagePaths = currentPaths
+                        )
 
-                    if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
-                        try {
-                            val ebayResponse = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
-                                query = draft.categoryKeywords,
-                                authorization = "Bearer $ebayAccessToken"
-                            )
-                            val firstCategory = ebayResponse.categorySuggestions?.firstOrNull()?.category
-                            if (firstCategory != null) {
-                                draft = draft.copy(categoryId = firstCategory.categoryId)
-                            }
-                        } catch (e: Exception) {}
+                        if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
+                            try {
+                                val ebayResponse = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
+                                    query = draft.categoryKeywords,
+                                    authorization = "Bearer $ebayAccessToken"
+                                )
+                                val firstCategory = ebayResponse.categorySuggestions?.firstOrNull()?.category
+                                if (firstCategory != null) {
+                                    draft = draft.copy(categoryId = firstCategory.categoryId)
+                                }
+                            } catch (e: Exception) {}
+                        }
+
+                        _uiState.value = QuiksaleUiState.Success(draft)
+                        settingsManager.saveCurrentDraft(gson.toJson(draft))
+                    } catch (e: Exception) {
+                        _uiState.value = QuiksaleUiState.Error("KI-Daten konnten nicht gelesen werden. Bitte erneut versuchen.")
                     }
-
-                    _uiState.value = QuiksaleUiState.Success(draft)
-                    settingsManager.saveCurrentDraft(gson.toJson(draft))
                 } else {
                     _uiState.value = QuiksaleUiState.Error("Keine Antwort von der KI erhalten.")
                 }
@@ -253,7 +255,6 @@ class QuiksaleViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // 1. Bilder laden und zum EPS hochladen
                 val totalImages = paths.size
                 val imageUrls = mutableListOf<String>()
                 
@@ -276,7 +277,6 @@ class QuiksaleViewModel : ViewModel() {
                     return@launch
                 }
 
-                // 2. Inventory Item
                 _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird erstellt...", 0.9f)
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
@@ -302,7 +302,6 @@ class QuiksaleViewModel : ViewModel() {
                 )
 
                 if (inventoryResponse.isSuccessful) {
-                    // 3. Offer
                     _uploadState.value = UploadUiState.Loading("Angebot wird generiert...", 0.95f)
                     val priceValue = sanitizePrice(if (draft.suggestedPrice.isNotBlank()) draft.suggestedPrice else defaultPrice)
                     val duration = if (draft.listingFormat == "FIXED_PRICE") "GTC" else "DAYS_7"
@@ -363,34 +362,70 @@ class QuiksaleViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Ruft eBay-Einstellungen (Standort, Versand, Zahlung, Rückgabe) automatisch ab.
-     */
+    private suspend fun uploadSingleImage(bitmap: Bitmap, token: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val resized = ImageUtils.resizeBitmap(bitmap)
+                val stream = ByteArrayOutputStream()
+                resized.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                val imageByteArray = stream.toByteArray()
+
+                // XML-Payload für Trading API
+                val xmlPayload = """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+                        <PictureSet>Supersize</PictureSet>
+                        <ExtensionIn>Binary</ExtensionIn>
+                    </UploadSiteHostedPicturesRequest>
+                """.trimIndent()
+
+                val xmlPart = MultipartBody.Part.createFormData(
+                    "XMLPayload", 
+                    null, 
+                    xmlPayload.toRequestBody("text/xml".toMediaTypeOrNull())
+                )
+
+                val imagePart = MultipartBody.Part.createFormData(
+                    "file", 
+                    "image.jpg", 
+                    imageByteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                )
+
+                val responseBody = EbayRetrofitClient.ebayApiService.uploadPicture(
+                    xmlRequest = xmlPart,
+                    picture = imagePart
+                ).string()
+
+                val urlRegex = Regex("<FullSizeInternalURL>(.*?)</FullSizeInternalURL>")
+                val match = urlRegex.find(responseBody)
+                match?.groupValues?.get(1)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
+
     fun fetchEbaySettings(token: String, settingsManager: SettingsManager, onResult: (String) -> Unit) {
         viewModelScope.launch {
             _isFetchingSettings.value = true
             try {
                 val authHeader = "Bearer $token"
-
-                // 1. Merchant Locations laden
                 val locationsResponse = EbayRetrofitClient.ebayApiService.getLocations(authHeader)
                 val locList = locationsResponse.locations ?: emptyList()
                 _locations.value = locList
                 locList.firstOrNull()?.let { settingsManager.saveEbayMerchantLocation(it.merchantLocationKey) }
 
-                // 2. Fulfillment Policies laden
                 val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader)
                 val fullList = fulfillmentResponse.fulfillmentPolicies ?: emptyList()
                 _fulfillmentPolicies.value = fullList
                 fullList.firstOrNull()?.let { settingsManager.saveEbayFulfillmentPolicy(it.policyId) }
 
-                // 3. Payment Policies laden
                 val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader)
                 val payList = paymentResponse.paymentPolicies ?: emptyList()
                 _paymentPolicies.value = payList
                 payList.firstOrNull()?.let { settingsManager.saveEbayPaymentPolicy(it.policyId) }
 
-                // 4. Return Policies laden
                 val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader)
                 val retList = returnResponse.returnPolicies ?: emptyList()
                 _returnPolicies.value = retList
@@ -408,11 +443,9 @@ class QuiksaleViewModel : ViewModel() {
 
     private fun formatStartTime(text: String): String? {
         if (text.isBlank() || text.uppercase() == "SOFORT") return null
-        
         return try {
             val inputSdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.GERMANY)
             val date = inputSdf.parse(text)
-            
             val outputSdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
             outputSdf.timeZone = TimeZone.getTimeZone("UTC")
             if (date != null) outputSdf.format(date) else null
@@ -425,11 +458,9 @@ class QuiksaleViewModel : ViewModel() {
             calendar.set(Calendar.MINUTE, 0)
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
-
             if (calendar.timeInMillis <= System.currentTimeMillis()) {
                 calendar.add(Calendar.DAY_OF_YEAR, 7)
             }
-            
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
             sdf.timeZone = TimeZone.getTimeZone("UTC")
             sdf.format(calendar.time)
@@ -446,27 +477,6 @@ class QuiksaleViewModel : ViewModel() {
         }
     }
 
-    private suspend fun uploadSingleImage(bitmap: Bitmap, token: String): String? {
-        return try {
-            val resizedBitmap = ImageUtils.resizeBitmap(bitmap)
-            val stream = ByteArrayOutputStream()
-            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-            val byteArray = stream.toByteArray()
-            
-            val requestBody = byteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
-            val body = MultipartBody.Part.createFormData("file", "image.jpg", requestBody)
-
-            val response = EbayRetrofitClient.ebayApiService.uploadPicture(
-                authorization = "Bearer $token",
-                picture = body
-            )
-
-            response.FullSizeInternalURL
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     private fun parseEbayError(errorJson: String?): String {
         if (errorJson.isNullOrBlank()) return "Unbekannter API-Fehler"
         return try {
@@ -476,7 +486,6 @@ class QuiksaleViewModel : ViewModel() {
                 val firstError = errors.getJSONObject(0)
                 val message = firstError.optString("message")
                 val longMessage = firstError.optString("longMessage")
-                
                 val parameters = firstError.optJSONArray("parameters")
                 val paramsStr = if (parameters != null && parameters.length() > 0) {
                     val pList = mutableListOf<String>()
@@ -488,7 +497,6 @@ class QuiksaleViewModel : ViewModel() {
                     }
                     " [" + pList.joinToString(", ") + "]"
                 } else ""
-
                 val baseMsg = if (longMessage.isNotBlank()) longMessage else message
                 baseMsg + paramsStr
             } else {

@@ -2,38 +2,25 @@ package com.example.ebayquicksale
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import net.openid.appauth.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
-class EbayAuthManager(
-    private val context: Context,
-    private val settingsManager: SettingsManager
-) {
+class EbayAuthManager(private val context: Context, private val settingsManager: SettingsManager) {
 
     private val authService = AuthorizationService(context)
-    
-    // eBay OAuth Endpoints
     private val serviceConfig = AuthorizationServiceConfiguration(
-        Uri.parse("https://auth.ebay.com/oauth2/authorize"), // Auth Endpoint
-        Uri.parse("https://api.ebay.com/identity/v1/oauth2/token") // Token Endpoint
+        android.net.Uri.parse("https://auth.ebay.com/oauth2/authorize"),
+        android.net.Uri.parse("https://api.ebay.com/identity/v1/oauth2/token")
     )
 
-    private val redirectUri = Uri.parse("quiksale://oauth2redirect")
-
     fun createAuthIntent(clientId: String): Intent {
-        val authRequest = AuthorizationRequest.Builder(
-            serviceConfig,
-            clientId,
-            ResponseTypeValues.CODE,
-            redirectUri
+        val request = AuthorizationRequest.Builder(
+            serviceConfig, clientId, ResponseTypeValues.CODE,
+            android.net.Uri.parse("quicksale://oauth")
         ).setScope("https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/ebay_api_all")
          .build()
-
-        return authService.getAuthorizationRequestIntent(authRequest)
+        return authService.getAuthorizationRequestIntent(request)
     }
 
     fun handleAuthResponse(intent: Intent, clientSecret: String, callback: (String?, String?) -> Unit) {
@@ -41,59 +28,47 @@ class EbayAuthManager(
         val ex = AuthorizationException.fromIntent(intent)
 
         if (response != null) {
-            val clientAuth: ClientAuthentication = ClientSecretBasic(clientSecret)
-            authService.performTokenRequest(
-                response.createTokenExchangeRequest(),
-                clientAuth
-            ) { tokenResponse, tokenException ->
+            val clientAuth: ClientAuthentication = ClientSecretPost(clientSecret)
+            authService.performTokenRequest(response.createTokenExchangeRequest(), clientAuth) { tokenResponse, tokenEx ->
+                val state = AuthState(response, tokenResponse, tokenEx)
                 if (tokenResponse != null) {
-                    val accessToken = tokenResponse.accessToken
-                    val refreshToken = tokenResponse.refreshToken
-                    
                     CoroutineScope(Dispatchers.IO).launch {
-                        settingsManager.saveEbayAccessToken(accessToken)
-                        settingsManager.saveEbayRefreshToken(refreshToken)
+                        settingsManager.saveEbayAuthState(state.jsonSerializeString())
+                        settingsManager.saveEbayAccessToken(state.accessToken)
+                        settingsManager.saveEbayRefreshToken(state.refreshToken)
+                        withContext(Dispatchers.Main) { callback(state.accessToken, null) }
                     }
-                    callback(accessToken, null)
                 } else {
-                    callback(null, tokenException?.message ?: "Token exchange failed")
+                    callback(null, tokenEx?.localizedMessage)
                 }
             }
         } else {
-            callback(null, ex?.message ?: "Auth failed")
+            callback(null, ex?.localizedMessage)
         }
     }
 
     fun getValidAccessToken(clientId: String, clientSecret: String, callback: (String?) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            val accessToken = settingsManager.ebayAccessToken.first()
-            val refreshToken = settingsManager.ebayRefreshToken.first()
-            
-            if (accessToken == null || refreshToken == null) {
-                callback(null)
+            val savedJson = settingsManager.ebayAuthState.first()
+            if (savedJson == null) {
+                withContext(Dispatchers.Main) { callback(null) }
                 return@launch
             }
 
-            // Wir bauen ein minimales AuthState Objekt aus den gespeicherten Daten
-            // (In einer echten App würde man das AuthState JSON serialisiert speichern)
-            val authState = AuthState(serviceConfig)
-            authState.update(TokenResponse.Builder(
-                TokenRequest.Builder(serviceConfig, clientId).setRefreshToken(refreshToken).build()
-            ).setAccessToken(accessToken).setRefreshToken(refreshToken).build(), null)
+            try {
+                val authState = AuthState.jsonDeserialize(savedJson)
+                val clientAuth: ClientAuthentication = ClientSecretPost(clientSecret)
 
-            val clientAuth: ClientAuthentication = ClientSecretBasic(clientSecret)
-            
-            authState.performActionWithFreshTokens(authService, clientAuth) { freshAccessToken, _, _ ->
-                if (freshAccessToken != null) {
-                    if (freshAccessToken != accessToken) {
-                        CoroutineScope(Dispatchers.IO).launch {
-                            settingsManager.saveEbayAccessToken(freshAccessToken)
-                        }
+                // performActionWithFreshTokens übernimmt das Refreshing automatisch
+                authState.performActionWithFreshTokens(authService, clientAuth) { accessToken, _, ex ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        settingsManager.saveEbayAuthState(authState.jsonSerializeString())
+                        settingsManager.saveEbayAccessToken(authState.accessToken)
+                        withContext(Dispatchers.Main) { callback(accessToken) }
                     }
-                    callback(freshAccessToken)
-                } else {
-                    callback(null)
                 }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { callback(null) }
             }
         }
     }
