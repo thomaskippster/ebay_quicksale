@@ -475,9 +475,6 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
 
-    var shippingService by remember { mutableStateOf("DHL Paket") }
-    var weight by remember { mutableStateOf("") }
-
     val missingFields = mutableListOf<String>()
     if (ebayToken.isBlank()) missingFields.add("eBay Login")
     if (draft.categoryId.isBlank()) missingFields.add("Kategorie ID")
@@ -526,15 +523,15 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SafeTextField(value = draft.quantity.toString(), onValueChange = { viewModel.updateDraft(draft.copy(quantity = it.toIntOrNull() ?: 1), settingsManager) }, label = "Stückzahl", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-            SafeTextField(value = weight, onValueChange = { weight = it }, label = "Gewicht (kg)", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            SafeTextField(value = draft.weight, onValueChange = { viewModel.updateDraft(draft.copy(weight = it), settingsManager) }, label = "Gewicht (kg)", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
 
         val shippers = listOf("DHL Paket", "Hermes Päckchen", "Deutsche Post Brief")
         var shipperExpanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(expanded = shipperExpanded, onExpandedChange = { shipperExpanded = !shipperExpanded }) {
-            OutlinedTextField(value = shippingService, onValueChange = {}, label = { Text("Versanddienstleister") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = shipperExpanded) })
+            OutlinedTextField(value = draft.shippingService, onValueChange = {}, label = { Text("Versanddienstleister") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = shipperExpanded) })
             ExposedDropdownMenu(expanded = shipperExpanded, onDismissRequest = { shipperExpanded = false }) {
-                shippers.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { shippingService = s; shipperExpanded = false }) }
+                shippers.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { viewModel.updateDraft(draft.copy(shippingService = s), settingsManager); shipperExpanded = false }) }
             }
         }
 

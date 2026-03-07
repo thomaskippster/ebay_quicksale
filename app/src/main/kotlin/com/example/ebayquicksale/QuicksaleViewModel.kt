@@ -44,6 +44,8 @@ data class EbayDraft(
     val mpn: String = "Nicht zutreffend",
     val imagePaths: List<String> = emptyList(),
     val quantity: Int = 1,
+    val weight: String = "",
+    val shippingService: String = "DHL Paket",
     val aspects: Map<String, String> = emptyMap(),
     val bestOfferEnabled: Boolean = false,
     val localizedLegalNotice: String = ""
@@ -350,7 +352,12 @@ class QuicksaleViewModel : ViewModel() {
                     availability = Availability(
                         shipToLocationAvailability = ShipToLocationAvailability(draft.quantity),
                         merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null
-                    )
+                    ),
+                    packageWeightAndSize = if (draft.weight.isNotBlank()) {
+                        try {
+                            PackageWeightAndSize(weight = Weight(value = draft.weight.replace(",", ".").toDouble()))
+                        } catch (e: Exception) { null }
+                    } else null
                 )
 
                 val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(

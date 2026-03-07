@@ -21,7 +21,17 @@ data class CategoryInfo(
 data class InventoryItemRequest(
     val product: Product,
     val condition: String,
-    val availability: Availability
+    val availability: Availability,
+    val packageWeightAndSize: PackageWeightAndSize? = null
+)
+
+data class PackageWeightAndSize(
+    val weight: Weight? = null
+)
+
+data class Weight(
+    val value: Double,
+    val unit: String = "KILOGRAM"
 )
 
 data class Product(
