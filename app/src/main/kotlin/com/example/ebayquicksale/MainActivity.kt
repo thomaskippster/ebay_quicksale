@@ -606,8 +606,7 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
                     fulfillmentId = fulfillmentPolicy,
                     returnId = returnPolicy,
                     startTimeText = ebayStartTime,
-                    settingsManager = settingsManager,
-                    context = context
+                    settingsManager = settingsManager
                 )
             },
             enabled = missingFields.isEmpty() && uploadState !is UploadUiState.Loading,

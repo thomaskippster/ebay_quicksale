@@ -283,8 +283,7 @@ class QuicksaleViewModel : ViewModel() {
         fulfillmentId: String,
         returnId: String,
         startTimeText: String,
-        settingsManager: SettingsManager,
-        context: Context
+        settingsManager: SettingsManager
     ) {
         val paths = _imagePaths.value
         if (paths.size > 12) {
