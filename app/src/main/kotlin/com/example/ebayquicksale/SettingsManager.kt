@@ -33,6 +33,17 @@ class SettingsManager(private val context: Context) {
         val EBAY_MARKETPLACE_ID = stringPreferencesKey("ebay_marketplace_id")
         val DISCLAIMER_ACCEPTED = booleanPreferencesKey("disclaimer_accepted")
         val APPEND_LEGAL_NOTICE = booleanPreferencesKey("append_legal_notice")
+        val KI_DISCLAIMER_ACCEPTED = booleanPreferencesKey("ki_disclaimer_accepted")
+    }
+
+    val kiDisclaimerAccepted: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KI_DISCLAIMER_ACCEPTED] ?: false
+    }
+
+    suspend fun saveKiDisclaimerAccepted(accepted: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KI_DISCLAIMER_ACCEPTED] = accepted
+        }
     }
 
     val disclaimerAccepted: Flow<Boolean> = context.dataStore.data.map { preferences ->

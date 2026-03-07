@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -91,7 +92,7 @@ fun QuicksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMana
         AlertDialog(
             onDismissRequest = { },
             title = { Text("Haftungsausschluss") },
-            text = { Text("Diese App ist ein Werkzeug zur Erleichterung von eBay-Verkäufen. Der Entwickler übernimmt keine Haftung für die Richtigkeit der von der KI generierten Texte, die Einhaltung von eBay-Richtlinien oder steuerliche Pflichten des Nutzers. Die Nutzung erfolgt auf eigene Gefahr.") },
+            text = { Text("Diese App ist ein Werkzeug zur Erleichterung von eBay-Verkäufen. Der Entwickler übernimmt keine Haftung für die Richtigkeit der von der KI generierten Texte, die Einhaltung von eBay-Richtlinien oder steuerliche Pflichten des Nutzers. Die Nutzung erfolgt auf eigene Gefahr.\n\nGemäß § 19 UStG wird keine Umsatzsteuer berechnet.") },
             confirmButton = {
                 Button(onClick = {
                     coroutineScope.launch {
@@ -110,7 +111,7 @@ fun QuicksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMana
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quicksale") },
+                title = { Text("Quicksale - KI eBay Assistent") },
                 actions = {
                     IconButton(onClick = { navController.navigate("main") }) {
                         Icon(Icons.Default.Home, contentDescription = "Home")
@@ -143,6 +144,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
     val imagePaths by viewModel.imagePaths.collectAsState()
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
@@ -153,6 +155,9 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
     val uploadState by viewModel.uploadState.collectAsState()
 
     val ebayMarketplaceId by settingsManager.ebayMarketplaceId.collectAsState(initial = "EBAY_DE")
+    
+    val kiDisclaimerAccepted by settingsManager.kiDisclaimerAccepted.collectAsState(initial = true)
+    var showKiDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uploadState) {
         if (uploadState is UploadUiState.Error) {
@@ -182,25 +187,55 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            val uri = createImageUri(context)
-            photoUri = uri
-            cameraLauncher.launch(uri)
+            if (!kiDisclaimerAccepted) {
+                showKiDialog = true
+            } else {
+                val uri = createImageUri(context)
+                photoUri = uri
+                cameraLauncher.launch(uri)
+            }
         }
+    }
+
+    if (showKiDialog) {
+        AlertDialog(
+            onDismissRequest = { showKiDialog = false },
+            title = { Text("DSGVO-Hinweis zur KI") },
+            text = { Text("Datenschutz-Hinweis: Ihre Fotos werden zur Analyse an Google Gemini übertragen. Mit der Nutzung erklären Sie sich damit einverstanden.") },
+            confirmButton = {
+                Button(onClick = {
+                    coroutineScope.launch {
+                        settingsManager.saveKiDisclaimerAccepted(true)
+                        showKiDialog = false
+                        val uri = createImageUri(context)
+                        photoUri = uri
+                        cameraLauncher.launch(uri)
+                    }
+                }) { Text("Einverstanden") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKiDialog = false }) { Text("Abbrechen") }
+            }
+        )
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
-        uris.forEach { uri ->
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                if (bitmap != null) {
-                    val resized = ImageUtils.resizeBitmap(bitmap)
-                    viewModel.addImage(context, resized)
-                    Toast.makeText(context, "Bild erfolgreich hinzugefügt", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {}
+        if (uris.isNotEmpty() && !kiDisclaimerAccepted) {
+            showKiDialog = true
+        } else {
+            uris.forEach { uri ->
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    if (bitmap != null) {
+                        val resized = ImageUtils.resizeBitmap(bitmap)
+                        viewModel.addImage(context, resized)
+                        Toast.makeText(context, "Bild erfolgreich hinzugefügt", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {}
+            }
         }
     }
     
@@ -231,9 +266,13 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
                     onClick = { 
                         when (PackageManager.PERMISSION_GRANTED) {
                             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
-                                val uri = createImageUri(context)
-                                photoUri = uri
-                                cameraLauncher.launch(uri)
+                                if (!kiDisclaimerAccepted) {
+                                    showKiDialog = true
+                                } else {
+                                    val uri = createImageUri(context)
+                                    photoUri = uri
+                                    cameraLauncher.launch(uri)
+                                }
                             }
                             else -> {
                                 permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -363,7 +402,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
 
         Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = "Quicksale ist kein offizielles Produkt von eBay Inc. Alle Marken gehören ihren jeweiligen Eigentümern.",
+            text = "Quicksale ist kein offizielles Produkt von eBay Inc. Alle Marken gehören ihren jeweiligen Eigentümern.\nGemäß § 19 UStG wird keine Umsatzsteuer berechnet.",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
             modifier = Modifier.padding(top = 16.dp),
@@ -382,6 +421,8 @@ private fun createImageUri(context: Context): Uri {
 fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager, viewModel: QuicksaleViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
@@ -397,6 +438,9 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val defaultLegalNotice by settingsManager.defaultLegalNotice.collectAsState(initial = "")
     val ebayMarketplaceId by settingsManager.ebayMarketplaceId.collectAsState(initial = "EBAY_DE")
     val appendLegalNotice by settingsManager.appendLegalNotice.collectAsState(initial = true)
+
+    var showImpressum by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
 
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.let { ebayAuthManager.handleAuthResponse(it, ebayClientSecret) { _, _ -> } }
@@ -427,6 +471,25 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         Button(onClick = { ebayAccessToken?.let { viewModel.fetchEbaySettings(it, ebayMarketplaceId, settingsManager) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() } } }, enabled = ebayAccessToken != null && !isFetchingSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
             if (isFetchingSettings) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("Policies automatisch laden")
         }
+        HorizontalDivider()
+        
+        Text("Rechtliches", style = MaterialTheme.typography.titleMedium)
+        ListItem(
+            headlineContent = { Text("Impressum") },
+            modifier = Modifier.clickable { showImpressum = true }
+        )
+        ListItem(
+            headlineContent = { Text("Datenschutzerklärung") },
+            modifier = Modifier.clickable { showPrivacy = true }
+        )
+        
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Händler-Status (EU-DSA)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("Diese App wird als kommerzielles Produkt angeboten. Der Anbieter ist als Händler registriert.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
         HorizontalDivider()
         Text("eBay Policies", style = MaterialTheme.typography.titleMedium)
         
@@ -477,6 +540,45 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         Button(onClick = { ImageUtils.clearInternalImageStorage(context); Toast.makeText(context, "Cache geleert", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Cache manuell leeren") }
         
         Text("App-Version 1.0.0", style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.CenterHorizontally), color = Color.Gray)
+    }
+
+    if (showImpressum) {
+        AlertDialog(
+            onDismissRequest = { showImpressum = false },
+            title = { Text("Impressum") },
+            text = {
+                Column {
+                    Text("Anbieter:", fontWeight = FontWeight.Bold)
+                    Text("Thomas Kipp")
+                    Text("Anschrift: [Deine Straße, PLZ Ort]")
+                    Text("E-Mail: deine.email@beispiel.de")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Umsatzsteuer-ID: [Falls vorhanden]")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.")
+                }
+            },
+            confirmButton = { TextButton(onClick = { showImpressum = false }) { Text("Schließen") } }
+        )
+    }
+
+    if (showPrivacy) {
+        AlertDialog(
+            onDismissRequest = { showPrivacy = false },
+            title = { Text("Datenschutzerklärung") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Datenschutz-Informationen", fontWeight = FontWeight.Bold)
+                    Text("1. Datenverarbeitung: Diese App speichert API-Keys und Zugangsdaten ausschließlich lokal auf Ihrem Gerät.")
+                    Text("2. Bildanalyse: Zur automatischen Beschreibungserstellung werden Ihre Fotos an Google Gemini (Google Cloud) übertragen. Google verarbeitet diese Daten gemäß deren Datenschutzbestimmungen für KI-Dienste.")
+                    Text("3. eBay-Schnittstelle: Zur Erstellung von Angeboten werden Daten an die eBay-API übertragen.")
+                    Text("4. Tracking: Wir erfassen keine persönlichen Nutzungsdaten.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { uriHandler.openUri("https://www.google.com/policies/privacy/") }) { Text("Google Datenschutz") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showPrivacy = false }) { Text("Schließen") } }
+        )
     }
 }
 
