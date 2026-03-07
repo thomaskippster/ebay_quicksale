@@ -42,7 +42,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -126,6 +125,8 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
     
     val uiState by viewModel.uiState.collectAsState()
     val uploadState by viewModel.uploadState.collectAsState()
+
+    val ebayMarketplaceId by settingsManager.ebayMarketplaceId.collectAsState(initial = "EBAY_DE")
 
     LaunchedEffect(uploadState) {
         if (uploadState is UploadUiState.Error) {
@@ -280,7 +281,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
 
         if (uiState !is QuicksaleUiState.Success) {
             Button(
-                onClick = { viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat, settingsManager) },
+                onClick = { viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat, ebayMarketplaceId, settingsManager) },
                 enabled = imagePaths.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuicksaleUiState.Loading && !isStorageCritical,
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
@@ -295,7 +296,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
         when (uiState) {
             is QuicksaleUiState.Success -> {
                 val draft = (uiState as QuicksaleUiState.Success).draft
-                DraftDisplay(draft, viewModel, ebayAccessToken ?: "", settingsManager)
+                DraftDisplay(draft, viewModel, ebayAccessToken ?: "", ebayMarketplaceId, settingsManager, context)
             }
             is QuicksaleUiState.Loading -> { }
             is QuicksaleUiState.Error -> {
@@ -383,7 +384,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         }
 
         Button(onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent(ebayClientId)) }, enabled = ebayClientId.isNotBlank() && ebayClientSecret.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Mit eBay verbinden") }
-        Button(onClick = { ebayAccessToken?.let { viewModel.fetchEbaySettings(it, settingsManager) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() } } }, enabled = ebayAccessToken != null && !isFetchingSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+        Button(onClick = { ebayAccessToken?.let { viewModel.fetchEbaySettings(it, ebayMarketplaceId, settingsManager) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() } } }, enabled = ebayAccessToken != null && !isFetchingSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
             if (isFetchingSettings) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("Policies automatisch laden")
         }
         HorizontalDivider()
@@ -433,7 +434,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 }
 
 @Composable
-fun CategorySearchDialog(onDismiss: () -> Unit, onCategorySelected: (String) -> Unit, ebayToken: String) {
+fun CategorySearchDialog(onDismiss: () -> Unit, onCategorySelected: (String) -> Unit, ebayToken: String, treeId: String) {
     var query by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf<List<CategoryInfo>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -441,7 +442,7 @@ fun CategorySearchDialog(onDismiss: () -> Unit, onCategorySelected: (String) -> 
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Kategorie suchen") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Suchbegriff") }, modifier = Modifier.fillMaxWidth(), trailingIcon = {
-                IconButton(onClick = { if (query.isNotBlank()) { loading = true; scope.launch { try { categories = EbayRetrofitClient.ebayApiService.getCategorySuggestions(query, "Bearer $ebayToken").categorySuggestions?.map { it.category } ?: emptyList() } catch (e: Exception) {} finally { loading = false } } } }) { Icon(Icons.Default.Settings, contentDescription = null) }
+                IconButton(onClick = { if (query.isNotBlank()) { loading = true; scope.launch { try { categories = EbayRetrofitClient.ebayApiService.getCategorySuggestions(treeId, query, "Bearer $ebayToken").categorySuggestions?.map { it.category } ?: emptyList() } catch (e: Exception) {} finally { loading = false } } } }) { Icon(Icons.Default.Settings, contentDescription = null) }
             })
             if (loading) CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             Box(modifier = Modifier.heightIn(max = 200.dp)) {
@@ -463,10 +464,9 @@ fun SafeTextField(value: String, onValueChange: (String) -> Unit, label: String,
 }
 
 @Composable
-fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: String, settingsManager: SettingsManager) {
+fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: String, marketplaceId: String, settingsManager: SettingsManager, context: Context) {
     var showCategoryDialog by remember { mutableStateOf(false) }
     val uploadState by viewModel.uploadState.collectAsState()
-    val context = LocalContext.current
     
     val ebayStartPrice by settingsManager.ebayStartPrice.collectAsState(initial = "1.00")
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
@@ -606,6 +606,7 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
                     fulfillmentId = fulfillmentPolicy,
                     returnId = returnPolicy,
                     startTimeText = ebayStartTime,
+                    marketplaceId = marketplaceId,
                     settingsManager = settingsManager
                 )
             },
@@ -621,6 +622,7 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
     }
 
     if (showCategoryDialog) {
-        CategorySearchDialog(onDismiss = { showCategoryDialog = false }, onCategorySelected = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager); showCategoryDialog = false }, ebayToken = ebayToken)
+        val treeId = viewModel.getTreeIdForMarketplace(marketplaceId)
+        CategorySearchDialog(onDismiss = { showCategoryDialog = false }, onCategorySelected = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager); showCategoryDialog = false }, ebayToken = ebayToken, treeId = treeId)
     }
 }

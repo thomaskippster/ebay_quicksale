@@ -23,8 +23,9 @@ interface EbayApiService {
     /**
      * Ruft eBay-Kategorie-Vorschläge basierend auf einem Such-String ab.
      */
-    @GET("commerce/taxonomy/v1/category_tree/77/get_category_suggestions")
+    @GET("commerce/taxonomy/v1/category_tree/{treeId}/get_category_suggestions")
     suspend fun getCategorySuggestions(
+        @Path("treeId") treeId: String,
         @Query("q") query: String,
         @Header("Authorization") authorization: String
     ): CategorySuggestionResponse
@@ -62,25 +63,28 @@ interface EbayApiService {
     /**
      * Ruft Versand-Policies (Fulfillment Policies) ab.
      */
-    @GET("sell/account/v1/fulfillment_policy?marketplace_id=EBAY_DE")
+    @GET("sell/account/v1/fulfillment_policy")
     suspend fun getFulfillmentPolicies(
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String
     ): PolicyResponse
 
     /**
      * Ruft Zahlungs-Policies (Payment Policies) ab.
      */
-    @GET("sell/account/v1/payment_policy?marketplace_id=EBAY_DE")
+    @GET("sell/account/v1/payment_policy")
     suspend fun getPaymentPolicies(
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String
     ): PolicyResponse
 
     /**
      * Ruft Rückgabe-Policies (Return Policies) ab.
      */
-    @GET("sell/account/v1/return_policy?marketplace_id=EBAY_DE")
+    @GET("sell/account/v1/return_policy")
     suspend fun getReturnPolicies(
-        @Header("Authorization") authorization: String
+        @Header("Authorization") authorization: String,
+        @Query("marketplace_id") marketplaceId: String
     ): PolicyResponse
 
     /**

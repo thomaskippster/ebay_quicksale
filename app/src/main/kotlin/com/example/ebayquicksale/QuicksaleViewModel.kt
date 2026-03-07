@@ -136,7 +136,17 @@ class QuicksaleViewModel : ViewModel() {
         }
     }
 
-    fun generateDraft(apiKey: String, ebayAccessToken: String?, defaultListingFormat: String, settingsManager: SettingsManager) {
+    fun getTreeIdForMarketplace(marketplaceId: String): String {
+        return when (marketplaceId) {
+            "EBAY_US" -> "0"
+            "EBAY_GB" -> "3"
+            "EBAY_AT" -> "16"
+            "EBAY_DE" -> "77"
+            else -> "77"
+        }
+    }
+
+    fun generateDraft(apiKey: String, ebayAccessToken: String?, defaultListingFormat: String, marketplaceId: String, settingsManager: SettingsManager) {
         val currentPaths = _imagePaths.value
         val currentNotes = _notes.value
 
@@ -249,7 +259,9 @@ class QuicksaleViewModel : ViewModel() {
 
                         if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
                             try {
+                                val treeId = getTreeIdForMarketplace(marketplaceId)
                                 val ebayResponse = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
+                                    treeId = treeId,
                                     query = draft.categoryKeywords,
                                     authorization = "Bearer $ebayAccessToken"
                                 )
@@ -283,6 +295,7 @@ class QuicksaleViewModel : ViewModel() {
         fulfillmentId: String,
         returnId: String,
         startTimeText: String,
+        marketplaceId: String,
         settingsManager: SettingsManager
     ) {
         val paths = _imagePaths.value
@@ -354,6 +367,7 @@ class QuicksaleViewModel : ViewModel() {
 
                     val offerRequest = OfferRequest(
                         sku = draft.sku,
+                        marketplaceId = marketplaceId,
                         categoryId = draft.categoryId,
                         format = draft.listingFormat,
                         listingDuration = duration,
@@ -424,7 +438,7 @@ class QuicksaleViewModel : ViewModel() {
         while (attempt < 3) {
             try {
                 return withContext(Dispatchers.IO) {
-                    val resized = ImageUtils.resizeBitmap(bitmap) // Resize to max 1600 inside ImageUtils
+                    val resized = ImageUtils.resizeBitmap(bitmap)
                     val stream = ByteArrayOutputStream()
                     resized.compress(Bitmap.CompressFormat.JPEG, 90, stream)
                     val imageByteArray = stream.toByteArray()
@@ -470,7 +484,7 @@ class QuicksaleViewModel : ViewModel() {
         throw Exception("Bild-Upload zu eBay fehlgeschlagen. Bitte Internetverbindung prüfen.")
     }
 
-    fun fetchEbaySettings(token: String, settingsManager: SettingsManager, onResult: (String) -> Unit) {
+    fun fetchEbaySettings(token: String, marketplaceId: String, settingsManager: SettingsManager, onResult: (String) -> Unit) {
         viewModelScope.launch {
             _isFetchingSettings.value = true
             try {
@@ -480,17 +494,17 @@ class QuicksaleViewModel : ViewModel() {
                 _locations.value = locList
                 locList.firstOrNull()?.let { settingsManager.saveEbayMerchantLocation(it.merchantLocationKey) }
 
-                val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader)
+                val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader, marketplaceId)
                 val fullList = fulfillmentResponse.fulfillmentPolicies ?: emptyList()
                 _fulfillmentPolicies.value = fullList
                 fullList.firstOrNull()?.let { settingsManager.saveEbayFulfillmentPolicy(it.policyId) }
 
-                val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader)
+                val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader, marketplaceId)
                 val payList = paymentResponse.paymentPolicies ?: emptyList()
                 _paymentPolicies.value = payList
                 payList.firstOrNull()?.let { settingsManager.saveEbayPaymentPolicy(it.policyId) }
 
-                val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader)
+                val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader, marketplaceId)
                 val retList = returnResponse.returnPolicies ?: emptyList()
                 _returnPolicies.value = retList
                 retList.firstOrNull()?.let { settingsManager.saveEbayReturnPolicy(it.policyId) }
