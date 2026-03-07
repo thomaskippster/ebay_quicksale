@@ -46,13 +46,19 @@ data class OfferRequest(
     val format: String,
     val listingDuration: String,
     val pricingSummary: PricingSummary,
+    val availableQuantity: Int,
     val merchantLocationKey: String? = null,
     val listingPolicies: ListingPolicies,
     val scheduledStartTime: String? = null
 )
 
 data class PricingSummary(
-    val price: Price
+    val price: Price,
+    val bestOfferDetails: BestOfferDetails? = null
+)
+
+data class BestOfferDetails(
+    val bestOfferEnabled: Boolean
 )
 
 data class Price(

@@ -89,4 +89,12 @@ interface EbayApiService {
     suspend fun getLocations(
         @Header("Authorization") authorization: String
     ): LocationResponse
+
+    /**
+     * Platzhalter für getMarketplaceId
+     */
+    @GET("sell/account/v1/privilege")
+    suspend fun getMarketplaceId(
+        @Header("Authorization") authorization: String
+    ): okhttp3.ResponseBody
 }

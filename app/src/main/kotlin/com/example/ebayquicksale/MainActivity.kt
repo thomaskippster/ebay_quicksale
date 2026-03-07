@@ -8,11 +8,13 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +42,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -140,6 +143,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
                 if (fullBitmap != null) {
                     val resizedBitmap = ImageUtils.resizeBitmap(fullBitmap)
                     viewModel.addImage(context, resizedBitmap)
+                    Toast.makeText(context, "Bild erfolgreich hinzugefügt", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Fehler beim Laden des Bildes", Toast.LENGTH_SHORT).show()
@@ -167,11 +171,16 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
                 if (bitmap != null) {
                     val resized = ImageUtils.resizeBitmap(bitmap)
                     viewModel.addImage(context, resized)
+                    Toast.makeText(context, "Bild erfolgreich hinzugefügt", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {}
         }
     }
     
+    val statFs = android.os.StatFs(Environment.getDataDirectory().path)
+    val availableMB = statFs.availableBlocksLong * statFs.blockSizeLong / (1024 * 1024)
+    val isStorageCritical = availableMB < 100
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -180,6 +189,12 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (isStorageCritical) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
+                Text(text = "⚠️ Speicherplatz kritisch ($availableMB MB). Bitte Platz schaffen.", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+            }
+        }
+
         if (uiState !is QuicksaleUiState.Success) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -214,7 +229,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
 
         if (imagePaths.isNotEmpty()) {
             LazyRow(
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier.fillMaxWidth().height(140.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(imagePaths) { path ->
@@ -231,6 +246,16 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
+                                Column(
+                                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.5f))
+                                ) {
+                                    TextButton(
+                                        onClick = { viewModel.moveImageToFront(path) },
+                                        modifier = Modifier.fillMaxWidth().height(36.dp)
+                                    ) {
+                                        Text("Galeriebild", color = Color.White, fontSize = 10.sp)
+                                    }
+                                }
                                 IconButton(
                                     onClick = { viewModel.removeImage(path) },
                                     modifier = Modifier.align(Alignment.TopEnd).size(32.dp).padding(4.dp)
@@ -256,7 +281,7 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
         if (uiState !is QuicksaleUiState.Success) {
             Button(
                 onClick = { viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat, settingsManager) },
-                enabled = imagePaths.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuicksaleUiState.Loading,
+                enabled = imagePaths.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuicksaleUiState.Loading && !isStorageCritical,
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 if (uiState is QuicksaleUiState.Loading) {
@@ -329,7 +354,12 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
+    val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
+    val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
+    val ebayListingFormat by settingsManager.ebayListingFormat.collectAsState(initial = "AUCTION")
     val isFetchingSettings by viewModel.isFetchingSettings.collectAsState()
+    val defaultLegalNotice by settingsManager.defaultLegalNotice.collectAsState(initial = "")
+    val ebayMarketplaceId by settingsManager.ebayMarketplaceId.collectAsState(initial = "EBAY_DE")
 
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.let { ebayAuthManager.handleAuthResponse(it, ebayClientSecret) { _, _ -> } }
@@ -342,6 +372,16 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         Text("eBay Credentials", style = MaterialTheme.typography.titleMedium)
         SafeTextField(value = ebayClientId, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } }, label = "Client ID", modifier = Modifier.fillMaxWidth())
         SafeTextField(value = ebayClientSecret, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientSecret(it) } }, label = "Client Secret", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        
+        val marketplaces = listOf("EBAY_DE", "EBAY_AT", "EBAY_GB", "EBAY_US")
+        var marketExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = marketExpanded, onExpandedChange = { marketExpanded = !marketExpanded }) {
+            OutlinedTextField(value = ebayMarketplaceId, onValueChange = {}, label = { Text("Marktplatz") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = marketExpanded) })
+            ExposedDropdownMenu(expanded = marketExpanded, onDismissRequest = { marketExpanded = false }) {
+                marketplaces.forEach { mp -> DropdownMenuItem(text = { Text(mp) }, onClick = { coroutineScope.launch { settingsManager.saveEbayMarketplaceId(mp) }; marketExpanded = false }) }
+            }
+        }
+
         Button(onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent(ebayClientId)) }, enabled = ebayClientId.isNotBlank() && ebayClientSecret.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Mit eBay verbinden") }
         Button(onClick = { ebayAccessToken?.let { viewModel.fetchEbaySettings(it, settingsManager) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() } } }, enabled = ebayAccessToken != null && !isFetchingSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
             if (isFetchingSettings) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("Policies automatisch laden")
@@ -367,10 +407,28 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             }
         }
 
+        SafeTextField(value = paymentPolicy, onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } }, label = "Zahlung Policy ID", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        SafeTextField(value = returnPolicy, onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } }, label = "Rückgabe Policy ID", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+
         HorizontalDivider()
         Text("Standard-Angebotsdaten", style = MaterialTheme.typography.titleMedium)
         SafeTextField(value = ebayStartPrice, onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartPrice(it) } }, label = "Preis (€)", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         SafeTextField(value = ebayStartTime, onValueChange = { coroutineScope.launch { settingsManager.saveEbayStartTime(it) } }, label = "Startzeit (SOFORT oder yyyy-MM-dd HH:mm)", modifier = Modifier.fillMaxWidth())
+        
+        val runtimes = listOf("DAYS_7", "GTC")
+        var runtimeExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = runtimeExpanded, onExpandedChange = { runtimeExpanded = !runtimeExpanded }) {
+            OutlinedTextField(value = if (ebayListingFormat == "DAYS_7") "7 Tage" else "GTC (Gültig bis auf Widerruf)", onValueChange = {}, label = { Text("Standard-Laufzeit") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = runtimeExpanded) })
+            ExposedDropdownMenu(expanded = runtimeExpanded, onDismissRequest = { runtimeExpanded = false }) {
+                runtimes.forEach { r -> DropdownMenuItem(text = { Text(if (r == "DAYS_7") "7 Tage" else "GTC") }, onClick = { coroutineScope.launch { settingsManager.saveEbayListingFormat(r) }; runtimeExpanded = false }) }
+            }
+        }
+
+        SafeTextField(value = defaultLegalNotice, onValueChange = { coroutineScope.launch { settingsManager.saveDefaultLegalNotice(it) } }, label = "Standard-Rechtstext", modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), singleLine = false)
+
+        Button(onClick = { ImageUtils.clearInternalImageStorage(context); Toast.makeText(context, "Cache geleert", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Cache manuell leeren") }
+        
+        Text("App-Version 1.0.0", style = MaterialTheme.typography.bodySmall, modifier = Modifier.align(Alignment.CenterHorizontally), color = Color.Gray)
     }
 }
 
@@ -398,6 +456,13 @@ fun CategorySearchDialog(onDismiss: () -> Unit, onCategorySelected: (String) -> 
 }
 
 @Composable
+fun SafeTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier, singleLine: Boolean = true, isError: Boolean = false, supportingText: @Composable (() -> Unit)? = null, keyboardOptions: KeyboardOptions = KeyboardOptions.Default) {
+    var localText by remember { mutableStateOf(value) }
+    LaunchedEffect(value) { if (value != localText) localText = value }
+    OutlinedTextField(value = localText, onValueChange = { localText = it; onValueChange(it) }, label = { Text(label) }, modifier = modifier, singleLine = singleLine, isError = isError, supportingText = supportingText, keyboardOptions = keyboardOptions)
+}
+
+@Composable
 fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: String, settingsManager: SettingsManager) {
     var showCategoryDialog by remember { mutableStateOf(false) }
     val uploadState by viewModel.uploadState.collectAsState()
@@ -409,6 +474,9 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
+
+    var shippingService by remember { mutableStateOf("DHL Paket") }
+    var weight by remember { mutableStateOf("") }
 
     val missingFields = mutableListOf<String>()
     if (ebayToken.isBlank()) missingFields.add("eBay Login")
@@ -422,26 +490,82 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         HorizontalDivider()
-        Text("Generierter Entwurf", style = MaterialTheme.typography.titleLarge)
         
-        SafeTextField(value = draft.title, onValueChange = { viewModel.updateDraft(draft.copy(title = it), settingsManager) }, label = "Titel", modifier = Modifier.fillMaxWidth())
+        AnimatedVisibility(visible = true) {
+            Text("Generierter Entwurf", style = MaterialTheme.typography.titleLarge)
+        }
+        
+        SafeTextField(
+            value = draft.title, 
+            onValueChange = { viewModel.updateDraft(draft.copy(title = it), settingsManager) }, 
+            label = "Titel", 
+            modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("${draft.title.length}/80 Zeichen") }
+        )
+        if (draft.title.length < 20) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Warnung: Titel ist sehr kurz.", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
         
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SafeTextField(value = draft.categoryId, onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager) }, label = "Kategorie ID", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             IconButton(onClick = { showCategoryDialog = true }) { Icon(Icons.Default.Settings, contentDescription = "Suchen") }
         }
 
-        // Zustand-Auswahl (Condition)
         val conditions = listOf("NEW", "LIKE_NEW", "USED_EXCELLENT", "USED_GOOD", "USED_ACCEPTABLE", "FOR_PARTS_OR_NOT_WORKING")
-        var conditionExpanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded = conditionExpanded, onExpandedChange = { conditionExpanded = !conditionExpanded }) {
-            OutlinedTextField(value = draft.condition, onValueChange = {}, label = { Text("Zustand") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = conditionExpanded) })
-            ExposedDropdownMenu(expanded = conditionExpanded, onDismissRequest = { conditionExpanded = false }) {
-                conditions.forEach { cond -> DropdownMenuItem(text = { Text(cond) }, onClick = { viewModel.updateDraft(draft.copy(condition = cond), settingsManager); conditionExpanded = false }) }
+        var condExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = condExpanded, onExpandedChange = { condExpanded = !condExpanded }) {
+            OutlinedTextField(value = draft.condition, onValueChange = {}, label = { Text("Zustand") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = condExpanded) })
+            ExposedDropdownMenu(expanded = condExpanded, onDismissRequest = { condExpanded = false }) {
+                conditions.forEach { cond ->
+                    DropdownMenuItem(text = { Text(cond) }, onClick = { viewModel.updateDraft(draft.copy(condition = cond), settingsManager); condExpanded = false })
+                }
             }
         }
 
-        SafeTextField(value = draft.descriptionHtml, onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it), settingsManager) }, label = "Beschreibung", modifier = Modifier.fillMaxWidth(), singleLine = false)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SafeTextField(value = draft.quantity.toString(), onValueChange = { viewModel.updateDraft(draft.copy(quantity = it.toIntOrNull() ?: 1), settingsManager) }, label = "Stückzahl", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            SafeTextField(value = weight, onValueChange = { weight = it }, label = "Gewicht (kg)", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+        }
+
+        val shippers = listOf("DHL Paket", "Hermes Päckchen", "Deutsche Post Brief")
+        var shipperExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = shipperExpanded, onExpandedChange = { shipperExpanded = !shipperExpanded }) {
+            OutlinedTextField(value = shippingService, onValueChange = {}, label = { Text("Versanddienstleister") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = shipperExpanded) })
+            ExposedDropdownMenu(expanded = shipperExpanded, onDismissRequest = { shipperExpanded = false }) {
+                shippers.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { shippingService = s; shipperExpanded = false }) }
+            }
+        }
+
+        if (draft.aspects.isNotEmpty()) {
+            Text("Merkmale (Aspects)", style = MaterialTheme.typography.titleMedium)
+            draft.aspects.forEach { (key, value) ->
+                SafeTextField(value = value, onValueChange = { newVal -> 
+                    val newAspects = draft.aspects.toMutableMap()
+                    newAspects[key] = newVal
+                    viewModel.updateDraft(draft.copy(aspects = newAspects), settingsManager) 
+                }, label = key, modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        var showPreview by remember { mutableStateOf(false) }
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))) {
+            Column(modifier = Modifier.padding(8.dp)) {
+                TextButton(onClick = { showPreview = !showPreview }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (showPreview) "Code anzeigen" else "HTML-Vorschau anzeigen")
+                }
+                if (showPreview) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx -> android.webkit.WebView(ctx).apply { loadDataWithBaseURL(null, draft.descriptionHtml, "text/html", "utf-8", null) } },
+                        update = { webView -> webView.loadDataWithBaseURL(null, draft.descriptionHtml, "text/html", "utf-8", null) },
+                        modifier = Modifier.fillMaxWidth().height(250.dp)
+                    )
+                } else {
+                    SafeTextField(value = draft.descriptionHtml, onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it), settingsManager) }, label = "HTML Code", modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp), singleLine = false)
+                }
+            }
+        }
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             SafeTextField(value = draft.suggestedPrice, onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it), settingsManager) }, label = "Preis (€)", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
@@ -450,19 +574,26 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
             formats.forEach { format ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.selectable(selected = draft.listingFormat == format, onClick = { viewModel.updateDraft(draft.copy(listingFormat = format), settingsManager) }, role = Role.RadioButton)) {
                     RadioButton(selected = draft.listingFormat == format, onClick = null)
-                    Text(text = if (format == "AUCTION") "Auktion" else "Festpreis", modifier = Modifier.padding(start = 4.dp))
+                    Text(text = if (format == "AUCTION") "Auktion" else "Sofort-Kauf", modifier = Modifier.padding(start = 4.dp))
                 }
             }
         }
 
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Switch(checked = draft.bestOfferEnabled, onCheckedChange = { viewModel.updateDraft(draft.copy(bestOfferEnabled = it), settingsManager) })
+            Text("Preisvorschlag erlauben", modifier = Modifier.padding(start = 8.dp))
+        }
+
         if (missingFields.isNotEmpty()) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
-                Text(text = "⚠️ Fehlende Daten: ${missingFields.joinToString(", ")}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+                Text(text = "⚠️ Bitte in den Einstellungen ausfüllen:\n${missingFields.joinToString(", ")}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
             }
         }
 
         Button(
             onClick = { 
+                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                vibrator?.vibrate(android.os.VibrationEffect.createOneShot(50, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
                 viewModel.uploadToEbay(
                     draft = draft,
                     token = ebayToken,
@@ -481,34 +612,13 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
         ) {
             if (uploadState is UploadUiState.Loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary) else Text("Auf eBay listen")
         }
+
+        OutlinedButton(onClick = { viewModel.resetAll(settingsManager, context) }, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text("Entwurf verwerfen", color = MaterialTheme.colorScheme.error)
+        }
     }
 
     if (showCategoryDialog) {
         CategorySearchDialog(onDismiss = { showCategoryDialog = false }, onCategorySelected = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager); showCategoryDialog = false }, ebayToken = ebayToken)
     }
-}
-
-@Composable
-fun SafeTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    modifier: Modifier = Modifier,
-    singleLine: Boolean = true,
-    isError: Boolean = false,
-    supportingText: @Composable (() -> Unit)? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
-) {
-    var localText by remember { mutableStateOf(value) }
-    LaunchedEffect(value) { if (value != localText) localText = value }
-    OutlinedTextField(
-        value = localText,
-        onValueChange = { localText = it; onValueChange(it) },
-        label = { Text(label) },
-        modifier = modifier,
-        singleLine = singleLine,
-        isError = isError,
-        supportingText = supportingText,
-        keyboardOptions = keyboardOptions
-    )
 }

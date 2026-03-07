@@ -28,6 +28,28 @@ class SettingsManager(private val context: Context) {
         val EBAY_LISTING_FORMAT = stringPreferencesKey("ebay_listing_format")
         val CURRENT_DRAFT_JSON = stringPreferencesKey("current_draft_json")
         val EBAY_AUTH_STATE = stringPreferencesKey("ebay_auth_state_json")
+        val EBAY_LEGAL_NOTICE_DEFAULT = stringPreferencesKey("ebay_legal_notice_default")
+        val EBAY_MARKETPLACE_ID = stringPreferencesKey("ebay_marketplace_id")
+    }
+
+    val defaultLegalNotice: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_LEGAL_NOTICE_DEFAULT] ?: ""
+    }
+
+    suspend fun saveDefaultLegalNotice(notice: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_LEGAL_NOTICE_DEFAULT] = notice
+        }
+    }
+
+    val ebayMarketplaceId: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_MARKETPLACE_ID] ?: "EBAY_DE"
+    }
+
+    suspend fun saveEbayMarketplaceId(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_MARKETPLACE_ID] = id
+        }
     }
 
     val ebayAuthState: Flow<String?> = context.dataStore.data.map { preferences ->

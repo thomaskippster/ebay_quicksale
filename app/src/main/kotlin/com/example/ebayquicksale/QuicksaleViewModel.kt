@@ -16,6 +16,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+data class ItemAspect(val name: String, val value: String)
+
 data class EbayDraft(
     val title: String,
     val descriptionHtml: String,
@@ -39,7 +42,11 @@ data class EbayDraft(
     val listingFormat: String = "AUCTION",
     val brand: String = "Markenlos",
     val mpn: String = "Nicht zutreffend",
-    val imagePaths: List<String> = emptyList()
+    val imagePaths: List<String> = emptyList(),
+    val quantity: Int = 1,
+    val aspects: Map<String, String> = emptyMap(),
+    val bestOfferEnabled: Boolean = false,
+    val localizedLegalNotice: String = ""
 )
 
 sealed interface QuicksaleUiState {
@@ -107,6 +114,14 @@ class QuicksaleViewModel : ViewModel() {
         } catch (e: Exception) {}
     }
 
+    fun moveImageToFront(path: String) {
+        val current = _imagePaths.value.toMutableList()
+        if (current.remove(path)) {
+            current.add(0, path)
+            _imagePaths.value = current
+        }
+    }
+
     fun loadDraftFromStorage(settingsManager: SettingsManager) {
         viewModelScope.launch {
             settingsManager.currentDraftJson.collect { json ->
@@ -168,7 +183,9 @@ class QuicksaleViewModel : ViewModel() {
                     "category_keywords" (2-3 Suchbegriffe, um die eBay-Kategorie zu finden),
                     "condition" (MUSS exakt einer dieser Werte sein: NEW, LIKE_NEW, USED_EXCELLENT, USED_GOOD, USED_ACCEPTABLE, FOR_PARTS_OR_NOT_WORKING),
                     "brand" (die Marke des Artikels, falls unbekannt 'Markenlos'),
-                    "mpn" (Herstellernummer, falls unbekannt 'Nicht zutreffend').
+                    "mpn" (Herstellernummer, falls unbekannt 'Nicht zutreffend'),
+                    "quantity" (Integer, immer '1', außer es sind im Bild eindeutig mehrere gleiche Artikel zu sehen),
+                    "aspects" (Ein JSON-Objekt/Map mit String-Keys und String-Werten. Identifiziere unbedingt Farbe, Material und Besonderheiten als Aspects, falls erkennbar).
                 """.trimIndent()
 
                 val inputContent = content {
@@ -183,20 +200,39 @@ class QuicksaleViewModel : ViewModel() {
                     try {
                         val cleanJson = responseText.replace("```json", "").replace("```", "").trim()
                         val json = JSONObject(cleanJson)
-                        
                         var htmlDesc = json.optString("description_html", "")
                             .replace("```html", "")
                             .replace("```", "")
                             .trim()
                             .replace(Regex("^\\s*[*\\-]\\s+"), "")
-                        
-                        htmlDesc += RECHTLICHER_HINWEIS
+
+                        val legalNotice = kotlinx.coroutines.flow.first(settingsManager.defaultLegalNotice)
+                        if (legalNotice.isNotBlank()) {
+                            htmlDesc += "<br><br><b>Rechtlicher Hinweis:</b> $legalNotice"
+                        } else {
+                            htmlDesc += RECHTLICHER_HINWEIS
+                        }
 
                         val timeStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
                         val shortUuid = UUID.randomUUID().toString().take(4)
                         
+                        val quantity = json.optInt("quantity", 1)
+                        
+                        val aspectsMap = mutableMapOf<String, String>()
+                        val aspectsJson = json.optJSONObject("aspects")
+                        if (aspectsJson != null) {
+                            val keys = aspectsJson.keys()
+                            while (keys.hasNext()) {
+                                val key = keys.next()
+                                val value = aspectsJson.optString(key)
+                                if (key.isNotBlank() && value.isNotBlank()) {
+                                    aspectsMap[key] = value
+                                }
+                            }
+                        }
+
                         var draft = EbayDraft(
-                            title = json.optString("title", "Kein Titel"),
+                            title = json.optString("title", "Kein Titel").take(80),
                             descriptionHtml = htmlDesc,
                             suggestedPrice = json.optString("suggested_price", "1.00"),
                             categoryKeywords = json.optString("category_keywords", ""),
@@ -205,7 +241,10 @@ class QuicksaleViewModel : ViewModel() {
                             listingFormat = defaultListingFormat,
                             brand = json.optString("brand", "Markenlos"),
                             mpn = json.optString("mpn", "Nicht zutreffend"),
-                            imagePaths = currentPaths
+                            imagePaths = currentPaths,
+                            quantity = quantity,
+                            aspects = aspectsMap,
+                            localizedLegalNotice = legalNotice
                         )
 
                         if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
@@ -268,11 +307,7 @@ class QuicksaleViewModel : ViewModel() {
                     val bitmap = try { BitmapFactory.decodeFile(paths[i]) } catch (e: Exception) { null }
                     if (bitmap != null) {
                         val url = uploadSingleImage(bitmap, token)
-                        if (url != null) imageUrls.add(url)
-                        else {
-                            _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload (Bild $currentNum).")
-                            return@launch
-                        }
+                        imageUrls.add(url)
                     }
                 }
 
@@ -282,19 +317,26 @@ class QuicksaleViewModel : ViewModel() {
                 }
 
                 _uploadState.value = UploadUiState.Loading("Inventar-Artikel wird erstellt...", 0.9f)
+                
+                val finalAspects = mutableMapOf<String, List<String>>()
+                finalAspects["Brand"] = listOf(if (draft.brand.isNotBlank()) draft.brand else "Markenlos")
+                finalAspects["MPN"] = listOf(if (draft.mpn.isNotBlank()) draft.mpn else "Nicht zutreffend")
+                draft.aspects.forEach { (k, v) ->
+                    if (k != "Brand" && k != "MPN") {
+                        finalAspects[k] = listOf(v)
+                    }
+                }
+
                 val inventoryRequest = InventoryItemRequest(
                     product = Product(
                         title = draft.title.take(80),
                         description = draft.descriptionHtml,
-                        imageUris = imageUrls,
-                        aspects = mapOf(
-                            "Brand" to listOf(if (draft.brand.isNotBlank()) draft.brand else "Markenlos"),
-                            "MPN" to listOf(if (draft.mpn.isNotBlank()) draft.mpn else "Nicht zutreffend")
-                        )
+                        imageUris = imageUrls.take(12),
+                        aspects = finalAspects
                     ),
                     condition = draft.condition,
                     availability = Availability(
-                        shipToLocationAvailability = ShipToLocationAvailability(1),
+                        shipToLocationAvailability = ShipToLocationAvailability(draft.quantity),
                         merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null
                     )
                 )
@@ -317,8 +359,10 @@ class QuicksaleViewModel : ViewModel() {
                         format = draft.listingFormat,
                         listingDuration = duration,
                         pricingSummary = PricingSummary(
-                            price = Price(value = priceValue)
+                            price = Price(value = priceValue),
+                            bestOfferDetails = if (draft.bestOfferEnabled) BestOfferDetails(true) else null
                         ),
+                        availableQuantity = draft.quantity,
                         merchantLocationKey = if (merchantLocation.isNotBlank()) merchantLocation else null,
                         listingPolicies = ListingPolicies(
                             fulfillmentPolicyId = fulfillmentId,
@@ -346,7 +390,17 @@ class QuicksaleViewModel : ViewModel() {
                                 val listingId = publishResponse.body()?.listingId ?: "Unbekannt"
                                 _uploadState.value = UploadUiState.Success(listingId)
                                 settingsManager.saveCurrentDraft(null)
-                                ImageUtils.clearInternalImageStorage(context)
+                                
+                                // Lösche nur Bilder dieses Drafts
+                                draft.imagePaths.forEach { path ->
+                                    try { File(path).delete() } catch(e:Exception){}
+                                }
+                                
+                                // Nach 5 Sekunden wieder Idle
+                                kotlinx.coroutines.delay(5000)
+                                if (_uploadState.value is UploadUiState.Success) {
+                                    _uploadState.value = UploadUiState.Idle
+                                }
                             } else {
                                 val errorMsg = parseEbayError(publishResponse.errorBody()?.string())
                                 _uploadState.value = UploadUiState.Error("eBay Fehler (Publish): $errorMsg")
@@ -361,52 +415,59 @@ class QuicksaleViewModel : ViewModel() {
                     _uploadState.value = UploadUiState.Error("eBay Fehler (Inventory): $errorMsg")
                 }
             } catch (e: Exception) {
-                _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.localizedMessage}")
+                _uploadState.value = UploadUiState.Error("Upload-Fehler: ${e.message ?: e.localizedMessage}")
             }
         }
     }
 
-    private suspend fun uploadSingleImage(bitmap: Bitmap, token: String): String? {
-        return withContext(Dispatchers.IO) {
+    private suspend fun uploadSingleImage(bitmap: Bitmap, token: String): String {
+        var attempt = 0
+        while (attempt < 3) {
             try {
-                val resized = ImageUtils.resizeBitmap(bitmap)
-                val stream = ByteArrayOutputStream()
-                resized.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-                val imageByteArray = stream.toByteArray()
+                return withContext(Dispatchers.IO) {
+                    val resized = ImageUtils.resizeBitmap(bitmap) // Resize to max 1600 inside ImageUtils
+                    val stream = ByteArrayOutputStream()
+                    resized.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+                    val imageByteArray = stream.toByteArray()
 
-                val xmlPayload = """
-                    <?xml version="1.0" encoding="utf-8"?>
-                    <UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-                        <PictureSet>Supersize</PictureSet>
-                        <ExtensionIn>Binary</ExtensionIn>
-                    </UploadSiteHostedPicturesRequest>
-                """.trimIndent()
+                    val xmlPayload = """
+                        <?xml version="1.0" encoding="utf-8"?>
+                        <UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+                            <PictureSet>Supersize</PictureSet>
+                            <ExtensionIn>Binary</ExtensionIn>
+                        </UploadSiteHostedPicturesRequest>
+                    """.trimIndent()
 
-                val xmlPart = MultipartBody.Part.createFormData(
-                    "XMLPayload", 
-                    null, 
-                    xmlPayload.toRequestBody("text/xml".toMediaTypeOrNull())
-                )
+                    val xmlPart = MultipartBody.Part.createFormData(
+                        "XMLPayload", 
+                        null, 
+                        xmlPayload.toRequestBody("text/xml".toMediaTypeOrNull())
+                    )
 
-                val imagePart = MultipartBody.Part.createFormData(
-                    "file", 
-                    "image.jpg", 
-                    imageByteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                )
+                    val imagePart = MultipartBody.Part.createFormData(
+                        "file", 
+                        "image.jpg", 
+                        imageByteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                    )
 
-                val responseBody = EbayRetrofitClient.ebayApiService.uploadPicture(
-                    xmlRequest = xmlPart,
-                    picture = imagePart
-                ).string()
+                    val responseBody = EbayRetrofitClient.ebayApiService.uploadPicture(
+                        xmlRequest = xmlPart,
+                        picture = imagePart
+                    ).string()
 
-                val urlRegex = Regex("<FullSizeInternalURL>(.*?)</FullSizeInternalURL>")
-                val match = urlRegex.find(responseBody)
-                match?.groupValues?.get(1)
+                    val urlRegex = Regex("<FullSizeInternalURL>(.*?)</FullSizeInternalURL>")
+                    val match = urlRegex.find(responseBody)
+                    match?.groupValues?.get(1) ?: throw Exception("URL nicht in eBay-Antwort gefunden.")
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
-                null
+                attempt++
+                if (attempt >= 3) {
+                    throw Exception("Bild-Upload zu eBay fehlgeschlagen. Bitte Internetverbindung prüfen.")
+                }
+                kotlinx.coroutines.delay(1000)
             }
         }
+        throw Exception("Bild-Upload zu eBay fehlgeschlagen. Bitte Internetverbindung prüfen.")
     }
 
     fun fetchEbaySettings(token: String, settingsManager: SettingsManager, onResult: (String) -> Unit) {
@@ -474,9 +535,10 @@ class QuicksaleViewModel : ViewModel() {
         val clean = input.replace(",", ".").replace(Regex("[^0-9.]"), "")
         return try {
             val price = clean.toDouble()
+            if (price <= 0) throw Exception("Preis muss größer als 0 sein.")
             String.format(Locale.US, "%.2f", price)
         } catch (e: Exception) {
-            "1.00"
+            throw Exception("Ungültiger Preis")
         }
     }
 
