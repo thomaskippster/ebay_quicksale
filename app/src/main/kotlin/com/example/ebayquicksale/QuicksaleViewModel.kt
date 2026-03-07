@@ -42,11 +42,11 @@ data class EbayDraft(
     val imagePaths: List<String> = emptyList()
 )
 
-sealed interface QuiksaleUiState {
-    object Idle : QuiksaleUiState
-    object Loading : QuiksaleUiState
-    data class Success(val draft: EbayDraft) : QuiksaleUiState
-    data class Error(val message: String) : QuiksaleUiState
+sealed interface QuicksaleUiState {
+    object Idle : QuicksaleUiState
+    object Loading : QuicksaleUiState
+    data class Success(val draft: EbayDraft) : QuicksaleUiState
+    data class Error(val message: String) : QuicksaleUiState
 }
 
 sealed interface UploadUiState {
@@ -56,10 +56,10 @@ sealed interface UploadUiState {
     data class Error(val message: String) : UploadUiState
 }
 
-class QuiksaleViewModel : ViewModel() {
+class QuicksaleViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow<QuiksaleUiState>(QuiksaleUiState.Idle)
-    val uiState: StateFlow<QuiksaleUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<QuicksaleUiState>(QuicksaleUiState.Idle)
+    val uiState: StateFlow<QuicksaleUiState> = _uiState.asStateFlow()
 
     private val _uploadState = MutableStateFlow<UploadUiState>(UploadUiState.Idle)
     val uploadState: StateFlow<UploadUiState> = _uploadState.asStateFlow()
@@ -110,10 +110,10 @@ class QuiksaleViewModel : ViewModel() {
     fun loadDraftFromStorage(settingsManager: SettingsManager) {
         viewModelScope.launch {
             settingsManager.currentDraftJson.collect { json ->
-                if (json != null && _uiState.value is QuiksaleUiState.Idle) {
+                if (json != null && _uiState.value is QuicksaleUiState.Idle) {
                     try {
                         val draft = gson.fromJson(json, EbayDraft::class.java)
-                        _uiState.value = QuiksaleUiState.Success(draft)
+                        _uiState.value = QuicksaleUiState.Success(draft)
                         _imagePaths.value = draft.imagePaths
                     } catch (e: Exception) {}
                 }
@@ -126,16 +126,16 @@ class QuiksaleViewModel : ViewModel() {
         val currentNotes = _notes.value
 
         if (apiKey.isBlank()) {
-            _uiState.value = QuiksaleUiState.Error("API Key fehlt. Bitte in den Einstellungen eintragen.")
+            _uiState.value = QuicksaleUiState.Error("API Key fehlt. Bitte in den Einstellungen eintragen.")
             return
         }
 
         if (currentPaths.isEmpty()) {
-            _uiState.value = QuiksaleUiState.Error("Bitte nimm mindestens ein Foto auf.")
+            _uiState.value = QuicksaleUiState.Error("Bitte nimm mindestens ein Foto auf.")
             return
         }
 
-        _uiState.value = QuiksaleUiState.Loading
+        _uiState.value = QuicksaleUiState.Loading
 
         viewModelScope.launch {
             try {
@@ -144,7 +144,7 @@ class QuiksaleViewModel : ViewModel() {
                 }
 
                 if (bitmaps.isEmpty()) {
-                    _uiState.value = QuiksaleUiState.Error("Fehler beim Laden der Bilder.")
+                    _uiState.value = QuicksaleUiState.Error("Fehler beim Laden der Bilder.")
                     return@launch
                 }
 
@@ -221,16 +221,16 @@ class QuiksaleViewModel : ViewModel() {
                             } catch (e: Exception) {}
                         }
 
-                        _uiState.value = QuiksaleUiState.Success(draft)
+                        _uiState.value = QuicksaleUiState.Success(draft)
                         settingsManager.saveCurrentDraft(gson.toJson(draft))
                     } catch (e: Exception) {
-                        _uiState.value = QuiksaleUiState.Error("KI-Daten konnten nicht gelesen werden. Bitte erneut versuchen.")
+                        _uiState.value = QuicksaleUiState.Error("KI-Daten konnten nicht gelesen werden. Bitte erneut versuchen.")
                     }
                 } else {
-                    _uiState.value = QuiksaleUiState.Error("Keine Antwort von der KI erhalten.")
+                    _uiState.value = QuicksaleUiState.Error("Keine Antwort von der KI erhalten.")
                 }
             } catch (e: Exception) {
-                _uiState.value = QuiksaleUiState.Error("Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
+                _uiState.value = QuicksaleUiState.Error("Fehler: ${e.localizedMessage ?: "Unbekannter Fehler"}")
             }
         }
     }
@@ -269,6 +269,10 @@ class QuiksaleViewModel : ViewModel() {
                     if (bitmap != null) {
                         val url = uploadSingleImage(bitmap, token)
                         if (url != null) imageUrls.add(url)
+                        else {
+                            _uploadState.value = UploadUiState.Error("Fehler beim Bilder-Upload (Bild $currentNum).")
+                            return@launch
+                        }
                     }
                 }
 
@@ -370,7 +374,6 @@ class QuiksaleViewModel : ViewModel() {
                 resized.compress(Bitmap.CompressFormat.JPEG, 90, stream)
                 val imageByteArray = stream.toByteArray()
 
-                // XML-Payload für Trading API
                 val xmlPayload = """
                     <?xml version="1.0" encoding="utf-8"?>
                     <UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -512,7 +515,7 @@ class QuiksaleViewModel : ViewModel() {
     }
 
     fun resetAll(settingsManager: SettingsManager, context: Context) {
-        _uiState.value = QuiksaleUiState.Idle
+        _uiState.value = QuicksaleUiState.Idle
         _uploadState.value = UploadUiState.Idle
         _notes.value = ""
         _imagePaths.value = emptyList()
@@ -524,8 +527,8 @@ class QuiksaleViewModel : ViewModel() {
 
     fun updateDraft(newDraft: EbayDraft, settingsManager: SettingsManager) {
         val currentState = _uiState.value
-        if (currentState is QuiksaleUiState.Success) {
-            _uiState.value = QuiksaleUiState.Success(newDraft)
+        if (currentState is QuicksaleUiState.Success) {
+            _uiState.value = QuicksaleUiState.Success(newDraft)
             _imagePaths.value = newDraft.imagePaths
             viewModelScope.launch {
                 settingsManager.saveCurrentDraft(gson.toJson(newDraft))

@@ -21,16 +21,19 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -62,15 +65,15 @@ class MainActivity : ComponentActivity() {
         ebayAuthManager = EbayAuthManager(this, settingsManager)
         
         setContent {
-            QuiksaleApp(settingsManager, ebayAuthManager)
+            QuicksaleApp(settingsManager, ebayAuthManager)
         }
     }
 }
 
 @Composable
-fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
+fun QuicksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     val navController = rememberNavController()
-    val viewModel: QuiksaleViewModel = viewModel()
+    val viewModel: QuicksaleViewModel = viewModel()
     
     LaunchedEffect(Unit) {
         viewModel.loadDraftFromStorage(settingsManager)
@@ -107,7 +110,7 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
 }
 
 @Composable
-fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
+fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) {
     val notes by viewModel.notes.collectAsState()
     val imagePaths by viewModel.imagePaths.collectAsState()
     var photoUri by remember { mutableStateOf<Uri?>(null) }
@@ -177,7 +180,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (uiState !is QuiksaleUiState.Success) {
+        if (uiState !is QuicksaleUiState.Success) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -250,13 +253,13 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
             singleLine = false
         )
 
-        if (uiState !is QuiksaleUiState.Success) {
+        if (uiState !is QuicksaleUiState.Success) {
             Button(
                 onClick = { viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat, settingsManager) },
-                enabled = imagePaths.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
+                enabled = imagePaths.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuicksaleUiState.Loading,
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
-                if (uiState is QuiksaleUiState.Loading) {
+                if (uiState is QuicksaleUiState.Loading) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
                 } else {
                     Text("Angebot generieren (Gemini)")
@@ -265,14 +268,14 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
         }
 
         when (uiState) {
-            is QuiksaleUiState.Success -> {
-                val draft = (uiState as QuiksaleUiState.Success).draft
+            is QuicksaleUiState.Success -> {
+                val draft = (uiState as QuicksaleUiState.Success).draft
                 DraftDisplay(draft, viewModel, ebayAccessToken ?: "", settingsManager)
             }
-            is QuiksaleUiState.Loading -> { }
-            is QuiksaleUiState.Error -> {
+            is QuicksaleUiState.Loading -> { }
+            is QuicksaleUiState.Error -> {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
-                    Text(text = (uiState as QuiksaleUiState.Error).message, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
+                    Text(text = (uiState as QuicksaleUiState.Error).message, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
                 }
             }
             else -> {}
@@ -287,6 +290,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Erfolgreich gelistet!", fontWeight = FontWeight.Bold)
                         Button(onClick = { uriHandler.openUri(url) }) { Text("Auf eBay ansehen") }
+                        Button(onClick = { viewModel.resetAll(settingsManager, context) }) { Text("Nächster Artikel") }
                     }
                 }
             }
@@ -314,7 +318,7 @@ private fun createImageUri(context: Context): Uri {
 }
 
 @Composable
-fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager, viewModel: QuiksaleViewModel) {
+fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager, viewModel: QuicksaleViewModel) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val geminiApiKey by settingsManager.geminiApiKey.collectAsState(initial = "")
@@ -394,14 +398,7 @@ fun CategorySearchDialog(onDismiss: () -> Unit, onCategorySelected: (String) -> 
 }
 
 @Composable
-fun SafeTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier, singleLine: Boolean = true, isError: Boolean = false, supportingText: @Composable (() -> Unit)? = null, keyboardOptions: KeyboardOptions = KeyboardOptions.Default) {
-    var localText by remember { mutableStateOf(value) }
-    LaunchedEffect(value) { if (value != localText) localText = value }
-    OutlinedTextField(value = localText, onValueChange = { localText = it; onValueChange(it) }, label = { Text(label) }, modifier = modifier, singleLine = singleLine, isError = isError, supportingText = supportingText, keyboardOptions = keyboardOptions)
-}
-
-@Composable
-fun DraftDisplay(draft: EbayDraft, viewModel: QuiksaleViewModel, ebayToken: String, settingsManager: SettingsManager) {
+fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: String, settingsManager: SettingsManager) {
     var showCategoryDialog by remember { mutableStateOf(false) }
     val uploadState by viewModel.uploadState.collectAsState()
     val context = LocalContext.current
@@ -413,6 +410,16 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuiksaleViewModel, ebayToken: Stri
     val returnPolicy by settingsManager.ebayReturnPolicy.collectAsState(initial = "")
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
 
+    val missingFields = mutableListOf<String>()
+    if (ebayToken.isBlank()) missingFields.add("eBay Login")
+    if (draft.categoryId.isBlank()) missingFields.add("Kategorie ID")
+    if (draft.title.isBlank()) missingFields.add("Titel")
+    if (draft.suggestedPrice.isBlank()) missingFields.add("Preis")
+    if (merchantLocation.isBlank()) missingFields.add("Standort")
+    if (paymentPolicy.isBlank()) missingFields.add("Zahlung")
+    if (fulfillmentPolicy.isBlank()) missingFields.add("Versand")
+    if (returnPolicy.isBlank()) missingFields.add("Rückgabe")
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         HorizontalDivider()
         Text("Generierter Entwurf", style = MaterialTheme.typography.titleLarge)
@@ -420,19 +427,37 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuiksaleViewModel, ebayToken: Stri
         SafeTextField(value = draft.title, onValueChange = { viewModel.updateDraft(draft.copy(title = it), settingsManager) }, label = "Titel", modifier = Modifier.fillMaxWidth())
         
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SafeTextField(value = draft.categoryId, onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager) }, label = "Kategorie ID", modifier = Modifier.weight(1f))
+            SafeTextField(value = draft.categoryId, onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager) }, label = "Kategorie ID", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             IconButton(onClick = { showCategoryDialog = true }) { Icon(Icons.Default.Settings, contentDescription = "Suchen") }
+        }
+
+        // Zustand-Auswahl (Condition)
+        val conditions = listOf("NEW", "LIKE_NEW", "USED_EXCELLENT", "USED_GOOD", "USED_ACCEPTABLE", "FOR_PARTS_OR_NOT_WORKING")
+        var conditionExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = conditionExpanded, onExpandedChange = { conditionExpanded = !conditionExpanded }) {
+            OutlinedTextField(value = draft.condition, onValueChange = {}, label = { Text("Zustand") }, readOnly = true, modifier = Modifier.fillMaxWidth().menuAnchor(), trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = conditionExpanded) })
+            ExposedDropdownMenu(expanded = conditionExpanded, onDismissRequest = { conditionExpanded = false }) {
+                conditions.forEach { cond -> DropdownMenuItem(text = { Text(cond) }, onClick = { viewModel.updateDraft(draft.copy(condition = cond), settingsManager); conditionExpanded = false }) }
+            }
         }
 
         SafeTextField(value = draft.descriptionHtml, onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it), settingsManager) }, label = "Beschreibung", modifier = Modifier.fillMaxWidth(), singleLine = false)
         
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            SafeTextField(value = draft.suggestedPrice, onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it), settingsManager) }, label = "Preis (€)", modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            
             val formats = listOf("AUCTION", "FIXED_PRICE")
             formats.forEach { format ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.selectable(selected = draft.listingFormat == format, onClick = { viewModel.updateDraft(draft.copy(listingFormat = format), settingsManager) }, role = Role.RadioButton)) {
                     RadioButton(selected = draft.listingFormat == format, onClick = null)
-                    Text(text = if (format == "AUCTION") "Auktion" else "Sofort-Kauf", modifier = Modifier.padding(start = 4.dp))
+                    Text(text = if (format == "AUCTION") "Auktion" else "Festpreis", modifier = Modifier.padding(start = 4.dp))
                 }
+            }
+        }
+
+        if (missingFields.isNotEmpty()) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
+                Text(text = "⚠️ Fehlende Daten: ${missingFields.joinToString(", ")}", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
             }
         }
 
@@ -451,7 +476,7 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuiksaleViewModel, ebayToken: Stri
                     context = context
                 )
             },
-            enabled = ebayToken.isNotBlank() && uploadState !is UploadUiState.Loading,
+            enabled = missingFields.isEmpty() && uploadState !is UploadUiState.Loading,
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) {
             if (uploadState is UploadUiState.Loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary) else Text("Auf eBay listen")
@@ -461,4 +486,29 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuiksaleViewModel, ebayToken: Stri
     if (showCategoryDialog) {
         CategorySearchDialog(onDismiss = { showCategoryDialog = false }, onCategorySelected = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager); showCategoryDialog = false }, ebayToken = ebayToken)
     }
+}
+
+@Composable
+fun SafeTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    isError: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    var localText by remember { mutableStateOf(value) }
+    LaunchedEffect(value) { if (value != localText) localText = value }
+    OutlinedTextField(
+        value = localText,
+        onValueChange = { localText = it; onValueChange(it) },
+        label = { Text(label) },
+        modifier = modifier,
+        singleLine = singleLine,
+        isError = isError,
+        supportingText = supportingText,
+        keyboardOptions = keyboardOptions
+    )
 }
