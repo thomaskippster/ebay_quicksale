@@ -8,27 +8,38 @@ object ImageUtils {
     /**
      * Skaliert ein Bitmap proportional herunter, falls Breite oder Höhe maxSize überschreiten.
      */
-    fun resizeBitmap(bitmap: Bitmap, maxSize: Int = 1024): Bitmap {
+    fun resizeBitmap(bitmap: Bitmap): Bitmap {
+        val maxSize = 1600
+        val minSize = 1000
         val width = bitmap.width
         val height = bitmap.height
 
-        if (width <= maxSize && height <= maxSize) return bitmap
-
         val ratio = width.toFloat() / height.toFloat()
-        val newWidth: Int
-        val newHeight: Int
 
-        if (width > height) {
-            newWidth = maxSize
-            newHeight = (maxSize / ratio).toInt()
-        } else {
-            newHeight = maxSize
-            newWidth = (maxSize * ratio).toInt()
+        var newWidth = width
+        var newHeight = height
+
+        if (width > maxSize || height > maxSize) {
+            if (width > height) {
+                newWidth = maxSize
+                newHeight = (maxSize / ratio).toInt()
+            } else {
+                newHeight = maxSize
+                newWidth = (maxSize * ratio).toInt()
+            }
+        } else if (width < minSize && height < minSize) {
+            // Upscaling als Notlösung für zu kleine Bilder
+            if (width > height) {
+                newWidth = minSize
+                newHeight = (minSize / ratio).toInt()
+            } else {
+                newHeight = minSize
+                newWidth = (minSize * ratio).toInt()
+            }
         }
 
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
-
     /**
      * Löscht alle temporären Bilder aus dem Cache-Verzeichnis, die mit "JPEG_" beginnen.
      */

@@ -49,6 +49,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.ebayquicksale.api.CategoryInfo
+import com.example.ebayquicksale.api.EbayRetrofitClient
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -75,6 +77,11 @@ fun QuiksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManag
     val navController = rememberNavController()
     val viewModel: QuiksaleViewModel = viewModel()
     
+    // Automatisch gespeicherten Entwurf beim Start laden
+    LaunchedEffect(Unit) {
+        viewModel.loadDraftFromStorage(settingsManager)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -160,7 +167,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         }
     }
 
-    // BLOCK 1: Galerie-Support hinzufügen
+    // Galerie-Support
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
@@ -280,7 +287,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
         if (uiState !is QuiksaleUiState.Success) {
             Button(
                 onClick = { 
-                    viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat)
+                    viewModel.generateDraft(geminiApiKey, ebayAccessToken, defaultListingFormat, settingsManager)
                 },
                 enabled = capturedBitmaps.isNotEmpty() && geminiApiKey.isNotBlank() && uiState !is QuiksaleUiState.Loading,
                 modifier = Modifier
@@ -343,7 +350,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             DropdownMenuItem(
                                 text = { Text(selectionOption) },
                                 onClick = {
-                                    viewModel.updateDraft(draft.copy(condition = selectionOption))
+                                    viewModel.updateDraft(draft.copy(condition = selectionOption), settingsManager)
                                     expanded = false
                                 },
                                 contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
@@ -362,7 +369,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.selectable(
                             selected = (draft.listingFormat == "AUCTION"),
-                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "AUCTION")) },
+                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "AUCTION"), settingsManager) },
                             role = Role.RadioButton
                         )
                     ) {
@@ -373,7 +380,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.selectable(
                             selected = (draft.listingFormat == "FIXED_PRICE"),
-                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "FIXED_PRICE")) },
+                            onClick = { viewModel.updateDraft(draft.copy(listingFormat = "FIXED_PRICE"), settingsManager) },
                             role = Role.RadioButton
                         )
                     ) {
@@ -384,7 +391,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
 
                 SafeTextField(
                     value = draft.title,
-                    onValueChange = { viewModel.updateDraft(draft.copy(title = it)) },
+                    onValueChange = { viewModel.updateDraft(draft.copy(title = it), settingsManager) },
                     label = "eBay Titel (max. 80 Zeichen)",
                     modifier = Modifier.fillMaxWidth(),
                     isError = draft.title.isBlank(),
@@ -400,7 +407,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 ) {
                     SafeTextField(
                         value = draft.suggestedPrice,
-                        onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it)) },
+                        onValueChange = { viewModel.updateDraft(draft.copy(suggestedPrice = it), settingsManager) },
                         label = "Preis (€)",
                         modifier = Modifier.width(120.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -409,31 +416,108 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             if (draft.suggestedPrice.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
                         }
                     )
-                    SafeTextField(
-                        value = draft.categoryId,
-                        onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it)) },
-                        label = "Kategorie ID",
-                        modifier = Modifier.width(150.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = draft.categoryId.isBlank(),
-                        supportingText = {
-                            if (draft.categoryId.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SafeTextField(
+                            value = draft.categoryId,
+                            onValueChange = { viewModel.updateDraft(draft.copy(categoryId = it), settingsManager) },
+                            label = "Kategorie ID",
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            isError = draft.categoryId.isBlank(),
+                            supportingText = {
+                                if (draft.categoryId.isBlank()) Text("Pflichtfeld", color = MaterialTheme.colorScheme.error)
+                            }
+                        )
+                        
+                        var showCategorySearch by remember { mutableStateOf(false) }
+                        IconButton(
+                            onClick = { showCategorySearch = true },
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = "Kategorie suchen")
                         }
+                        
+                        if (showCategorySearch) {
+                            CategorySearchDialog(
+                                onDismiss = { showCategorySearch = false },
+                                onCategorySelected = { id ->
+                                    viewModel.updateDraft(draft.copy(categoryId = id), settingsManager)
+                                    showCategorySearch = false
+                                },
+                                viewModel = viewModel,
+                                ebayToken = ebayAccessToken ?: ""
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SafeTextField(
+                        value = draft.brand,
+                        onValueChange = { viewModel.updateDraft(draft.copy(brand = it), settingsManager) },
+                        label = "Marke",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SafeTextField(
+                        value = draft.mpn,
+                        onValueChange = { viewModel.updateDraft(draft.copy(mpn = it), settingsManager) },
+                        label = "MPN",
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
                 Text("Artikelbeschreibung (HTML):", style = MaterialTheme.typography.titleMedium)
-                SafeTextField(
-                    value = draft.descriptionHtml,
-                    onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 200.dp, max = 400.dp),
-                    label = "HTML Code",
-                    singleLine = false
-                )
+                
+                var showPreview by remember { mutableStateOf(false) }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        TextButton(
+                            onClick = { showPreview = !showPreview },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (showPreview) "HTML Code anzeigen" else "Vorschau anzeigen")
+                        }
+                        
+                        if (showPreview) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { context ->
+                                    android.webkit.WebView(context).apply {
+                                        settings.javaScriptEnabled = false
+                                        loadDataWithBaseURL(null, draft.descriptionHtml, "text/html", "utf-8", null)
+                                    }
+                                },
+                                update = { webView ->
+                                    webView.loadDataWithBaseURL(null, draft.descriptionHtml, "text/html", "utf-8", null)
+                                },
+                                modifier = Modifier.fillMaxWidth().height(300.dp)
+                            )
+                        } else {
+                            SafeTextField(
+                                value = draft.descriptionHtml,
+                                onValueChange = { viewModel.updateDraft(draft.copy(descriptionHtml = it), settingsManager) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 100.dp, max = 300.dp),
+                                label = "HTML Code",
+                                singleLine = false
+                            )
+                        }
+                    }
+                }
 
-                // SCHRITT 2: Dynamische Warnung bei fehlenden Policies
+                // Warnung bei fehlenden Policies
                 val missingFields = mutableListOf<String>()
                 if (merchantLocation.isBlank()) missingFields.add("Standort")
                 if (paymentPolicy.isBlank()) missingFields.add("Zahlung")
@@ -454,9 +538,10 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     }
                 }
 
-                // SCHRITT 3: Vollständige Sperre des Upload-Buttons
+                val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                 Button(
                     onClick = { 
+                        keyboardController?.hide()
                         ebayAuthManager.getValidAccessToken(ebayClientId, ebayClientSecret) { validToken ->
                             if (validToken != null) {
                                 viewModel.uploadToEbay(
@@ -468,7 +553,8 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                                     paymentId = paymentPolicy,
                                     fulfillmentId = fulfillmentPolicy,
                                     returnId = returnPolicy,
-                                    startTimeText = ebayStartTime
+                                    startTimeText = ebayStartTime,
+                                    settingsManager = settingsManager
                                 )
                             } else {
                                 Toast.makeText(context, "Fehler: Kein gültiger eBay-Token. Bitte neu einloggen.", Toast.LENGTH_LONG).show()
@@ -506,7 +592,7 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                     OutlinedButton(
                         onClick = { 
                             ImageUtils.clearImageCache(context)
-                            viewModel.resetAll()
+                            viewModel.resetAll(settingsManager)
                         },
                         enabled = uploadState !is UploadUiState.Loading,
                         modifier = Modifier
@@ -518,14 +604,20 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                 }
 
                 if (uploadState is UploadUiState.Loading) {
+                    val loadingState = uploadState as UploadUiState.Loading
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
                     ) {
-                        CircularProgressIndicator()
+                        LinearProgressIndicator(
+                            progress = loadingState.progress,
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = (uploadState as UploadUiState.Loading).message,
+                            text = loadingState.message,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -541,23 +633,25 @@ fun MainScreen(viewModel: QuiksaleViewModel, settingsManager: SettingsManager, e
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "Erfolgreich hochgeladen! ✅",
+                                text = "Erfolgreich veröffentlicht! ✅",
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                 ),
                                 color = androidx.compose.ui.graphics.Color(0xFF2E7D32),
                                 modifier = Modifier.padding(top = 8.dp)
                             )
-                            Text(
-                                text = "Offer ID: ${successState.offerId}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = "eBay Artikelnummer: ${successState.listingId}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             
                             Button(
                                 onClick = {
                                     ImageUtils.clearImageCache(context)
-                                    viewModel.resetAll()
+                                    viewModel.resetAll(settingsManager)
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -774,37 +868,117 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         HorizontalDivider()
 
         Text("eBay Business Policies & Location", style = MaterialTheme.typography.titleMedium)
-        SafeTextField(
-            value = merchantLocation,
-            onValueChange = { coroutineScope.launch { settingsManager.saveEbayMerchantLocation(it) } },
-            label = "Merchant Location Key",
-            modifier = Modifier.fillMaxWidth()
-        )
 
-        // SCHRITT 5: Tastatur-Optimierung
-        SafeTextField(
-            value = paymentPolicy,
-            onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
-            label = "Payment Policy ID",
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
+        // Dropdown für Merchant Location
+        val locations by viewModel.locations.collectAsState()
+        var locExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = locExpanded,
+            onExpandedChange = { locExpanded = !locExpanded }
+        ) {
+            OutlinedTextField(
+                value = merchantLocation,
+                onValueChange = { coroutineScope.launch { settingsManager.saveEbayMerchantLocation(it) } },
+                label = { Text("Merchant Location Key") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = locExpanded) }
+            )
+            ExposedDropdownMenu(expanded = locExpanded, onDismissRequest = { locExpanded = false }) {
+                locations.forEach { loc ->
+                    DropdownMenuItem(
+                        text = { Text("${loc.name} (${loc.merchantLocationKey})") },
+                        onClick = {
+                            coroutineScope.launch { settingsManager.saveEbayMerchantLocation(loc.merchantLocationKey) }
+                            locExpanded = false
+                        }
+                    )
+                }
+            }
+        }
 
-        SafeTextField(
-            value = fulfillmentPolicy,
-            onValueChange = { coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(it) } },
-            label = "Fulfillment Policy ID",
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
+        // Dropdown für Payment Policy
+        val payPolicies by viewModel.paymentPolicies.collectAsState()
+        var payExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = payExpanded,
+            onExpandedChange = { payExpanded = !payExpanded }
+        ) {
+            OutlinedTextField(
+                value = paymentPolicy,
+                onValueChange = { coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(it) } },
+                label = { Text("Payment Policy ID") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = payExpanded) }
+            )
+            ExposedDropdownMenu(expanded = payExpanded, onDismissRequest = { payExpanded = false }) {
+                payPolicies.forEach { policy ->
+                    DropdownMenuItem(
+                        text = { Text("${policy.name} (${policy.policyId})") },
+                        onClick = {
+                            coroutineScope.launch { settingsManager.saveEbayPaymentPolicy(policy.policyId) }
+                            payExpanded = false
+                        }
+                    )
+                }
+            }
+        }
 
-        SafeTextField(
-            value = returnPolicy,
-            onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } },
-            label = "Return Policy ID",
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
+        // Dropdown für Fulfillment Policy
+        val fullPolicies by viewModel.fulfillmentPolicies.collectAsState()
+        var fullExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = fullExpanded,
+            onExpandedChange = { fullExpanded = !fullExpanded }
+        ) {
+            OutlinedTextField(
+                value = fulfillmentPolicy,
+                onValueChange = { coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(it) } },
+                label = { Text("Fulfillment Policy ID") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fullExpanded) }
+            )
+            ExposedDropdownMenu(expanded = fullExpanded, onDismissRequest = { fullExpanded = false }) {
+                fullPolicies.forEach { policy ->
+                    DropdownMenuItem(
+                        text = { Text("${policy.name} (${policy.policyId})") },
+                        onClick = {
+                            coroutineScope.launch { settingsManager.saveEbayFulfillmentPolicy(policy.policyId) }
+                            fullExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Dropdown für Return Policy
+        val retPolicies by viewModel.returnPolicies.collectAsState()
+        var retExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = retExpanded,
+            onExpandedChange = { retExpanded = !retExpanded }
+        ) {
+            OutlinedTextField(
+                value = returnPolicy,
+                onValueChange = { coroutineScope.launch { settingsManager.saveEbayReturnPolicy(it) } },
+                label = { Text("Return Policy ID") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = retExpanded) }
+            )
+            ExposedDropdownMenu(expanded = retExpanded, onDismissRequest = { retExpanded = false }) {
+                retPolicies.forEach { policy ->
+                    DropdownMenuItem(
+                        text = { Text("${policy.name} (${policy.policyId})") },
+                        onClick = {
+                            coroutineScope.launch { settingsManager.saveEbayReturnPolicy(policy.policyId) }
+                            retExpanded = false
+                        }
+                    )
+                }
+            }
+        }
 
         HorizontalDivider()
 
@@ -831,6 +1005,77 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             color = MaterialTheme.colorScheme.secondary
         )
     }
+}
+
+@Composable
+fun CategorySearchDialog(
+    onDismiss: () -> Unit,
+    onCategorySelected: (String) -> Unit,
+    viewModel: QuiksaleViewModel,
+    ebayToken: String
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var categories by remember { mutableStateOf<List<CategoryInfo>>(emptyList()) }
+    var isSearching by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("eBay Kategorie suchen") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Suchbegriff (z.B. Kamera)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            if (searchQuery.isNotBlank() && ebayToken.isNotBlank()) {
+                                isSearching = true
+                                coroutineScope.launch {
+                                    try {
+                                        val response = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
+                                            query = searchQuery,
+                                            authorization = "Bearer $ebayToken"
+                                        )
+                                        categories = response.categorySuggestions?.map { it.category } ?: emptyList()
+                                    } catch (e: Exception) {
+                                        // Fehlerbehandlung
+                                    } finally {
+                                        isSearching = false
+                                    }
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Suchen")
+                        }
+                    }
+                )
+
+                if (isSearching) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
+
+                Box(modifier = Modifier.heightIn(max = 300.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        items(categories) { category ->
+                            ListItem(
+                                headlineContent = { Text(category.categoryName) },
+                                supportingContent = { Text("ID: ${category.categoryId}") },
+                                modifier = androidx.compose.ui.Modifier.clickable {
+                                    onCategorySelected(category.categoryId)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schließen") }
+        }
+    )
 }
 
 @Composable

@@ -26,6 +26,21 @@ class SettingsManager(private val context: Context) {
         val EBAY_FULFILLMENT_POLICY = stringPreferencesKey("ebay_fulfillment_policy")
         val EBAY_RETURN_POLICY = stringPreferencesKey("ebay_return_policy")
         val EBAY_LISTING_FORMAT = stringPreferencesKey("ebay_listing_format")
+        val CURRENT_DRAFT_JSON = stringPreferencesKey("current_draft_json")
+    }
+
+    val currentDraftJson: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[CURRENT_DRAFT_JSON]
+    }
+
+    suspend fun saveCurrentDraft(json: String?) {
+        context.dataStore.edit { preferences ->
+            if (json == null) {
+                preferences.remove(CURRENT_DRAFT_JSON)
+            } else {
+                preferences[CURRENT_DRAFT_JSON] = json
+            }
+        }
     }
 
     val geminiApiKey: Flow<String> = context.dataStore.data.map { preferences ->

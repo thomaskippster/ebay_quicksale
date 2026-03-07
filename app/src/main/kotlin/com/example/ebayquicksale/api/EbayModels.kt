@@ -9,30 +9,26 @@ data class CategorySuggestionResponse(
 )
 
 data class CategorySuggestion(
-    @SerializedName("category")
-    val category: Category?,
-    @SerializedName("relevancy")
-    val relevancy: String?
+    val category: CategoryInfo
 )
 
-data class Category(
-    @SerializedName("categoryId")
+data class CategoryInfo(
     val categoryId: String,
-    @SerializedName("categoryName")
     val categoryName: String
 )
 
-// Inventory API Models (New)
+// Inventory API Models
 data class InventoryItemRequest(
     val product: Product,
-    val condition: String = "NEW",
-    val availability: Availability = Availability(ShipToLocationAvailability(1))
+    val condition: String,
+    val availability: Availability
 )
 
 data class Product(
     val title: String,
     val description: String,
-    val imageUris: List<String> = emptyList()
+    val imageUris: List<String>,
+    val aspects: Map<String, List<String>>? = null
 )
 
 data class Availability(
@@ -44,15 +40,12 @@ data class ShipToLocationAvailability(
     val quantity: Int
 )
 
-// Offer API Models (New)
 data class OfferRequest(
     val sku: String,
-    val marketplaceId: String = "EBAY_DE",
+    val categoryId: String,
     val format: String,
     val listingDuration: String,
-    val availableQuantity: Int = 1,
     val pricingSummary: PricingSummary,
-    val categoryId: String,
     val merchantLocationKey: String? = null,
     val listingPolicies: ListingPolicies,
     val scheduledStartTime: String? = null
@@ -71,18 +64,21 @@ data class OfferResponse(
     val offerId: String
 )
 
+data class PublishResponse(
+    val listingId: String
+)
+
 data class ListingPolicies(
     val fulfillmentPolicyId: String,
     val paymentPolicyId: String,
     val returnPolicyId: String
 )
 
-// Response Models for Policy and Location Discovery
+// Settings / Discovery Models
 data class PolicyResponse(
-    val total: Int, 
-    val fulfillmentPolicies: List<PolicyInfo>? = null, 
-    val paymentPolicies: List<PolicyInfo>? = null, 
-    val returnPolicies: List<PolicyInfo>? = null
+    @SerializedName("fulfillmentPolicies") val fulfillmentPolicies: List<PolicyInfo>?,
+    @SerializedName("paymentPolicies") val paymentPolicies: List<PolicyInfo>?,
+    @SerializedName("returnPolicies") val returnPolicies: List<PolicyInfo>?
 )
 
 data class PolicyInfo(val name: String, val policyId: String)

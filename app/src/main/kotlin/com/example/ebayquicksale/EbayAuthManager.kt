@@ -30,7 +30,7 @@ class EbayAuthManager(
             clientId,
             ResponseTypeValues.CODE,
             redirectUri
-        ).setScope("https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly https://api.ebay.com/oauth/api_scope/sell.inventory")
+        ).setScope("https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/ebay_api_all")
          .build()
 
         return authService.getAuthorizationRequestIntent(authRequest)

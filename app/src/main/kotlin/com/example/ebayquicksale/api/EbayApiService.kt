@@ -15,6 +15,7 @@ interface EbayApiService {
         @Header("X-EBAY-API-CALL-NAME") callName: String = "UploadSiteHostedPictures",
         @Header("X-EBAY-API-SITEID") siteId: String = "77", // 77 = Germany
         @Header("X-EBAY-API-COMPATIBILITY-LEVEL") compatibilityLevel: String = "1191",
+        @Header("X-EBAY-API-RESPONSE-ENCODING") responseEncoding: String = "JSON",
         @Part picture: MultipartBody.Part
     ): EbayPictureResponse
 
@@ -47,6 +48,15 @@ interface EbayApiService {
         @Header("Content-Language") contentLanguage: String = "de-DE",
         @Body body: OfferRequest
     ): retrofit2.Response<OfferResponse>
+
+    /**
+     * Veröffentlicht ein erstelltes Angebot (macht es live).
+     */
+    @POST("sell/inventory/v1/offer/{offerId}/publish")
+    suspend fun publishOffer(
+        @Path("offerId") offerId: String,
+        @Header("Authorization") authorization: String
+    ): retrofit2.Response<PublishResponse>
 
     /**
      * Ruft Versand-Policies (Fulfillment Policies) ab.
