@@ -592,8 +592,11 @@ fun DraftDisplay(draft: EbayDraft, viewModel: QuicksaleViewModel, ebayToken: Str
 
         Button(
             onClick = { 
+                @Suppress("DEPRECATION")
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                @Suppress("DEPRECATION")
                 vibrator?.vibrate(android.os.VibrationEffect.createOneShot(50, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                
                 viewModel.uploadToEbay(
                     draft = draft,
                     token = ebayToken,

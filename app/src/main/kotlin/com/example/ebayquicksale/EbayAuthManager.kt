@@ -47,7 +47,7 @@ class EbayAuthManager(private val context: Context, private val settingsManager:
         }
     }
 
-    fun getValidAccessToken(clientId: String, clientSecret: String, callback: (String?) -> Unit) {
+    fun getValidAccessToken(clientSecret: String, callback: (String?) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             val savedJson = settingsManager.ebayAuthState.first()
             if (savedJson == null) {
@@ -60,7 +60,7 @@ class EbayAuthManager(private val context: Context, private val settingsManager:
                 val clientAuth: ClientAuthentication = ClientSecretPost(clientSecret)
 
                 // performActionWithFreshTokens übernimmt das Refreshing automatisch
-                authState.performActionWithFreshTokens(authService, clientAuth) { accessToken, _, ex ->
+                authState.performActionWithFreshTokens(authService, clientAuth) { accessToken, _, _ ->
                     CoroutineScope(Dispatchers.IO).launch {
                         settingsManager.saveEbayAuthState(authState.jsonSerializeString())
                         settingsManager.saveEbayAccessToken(authState.accessToken)
