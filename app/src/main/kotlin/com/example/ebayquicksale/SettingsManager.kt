@@ -3,6 +3,7 @@ package com.example.ebayquicksale
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -30,6 +31,28 @@ class SettingsManager(private val context: Context) {
         val EBAY_AUTH_STATE = stringPreferencesKey("ebay_auth_state_json")
         val EBAY_LEGAL_NOTICE_DEFAULT = stringPreferencesKey("ebay_legal_notice_default")
         val EBAY_MARKETPLACE_ID = stringPreferencesKey("ebay_marketplace_id")
+        val DISCLAIMER_ACCEPTED = booleanPreferencesKey("disclaimer_accepted")
+        val APPEND_LEGAL_NOTICE = booleanPreferencesKey("append_legal_notice")
+    }
+
+    val disclaimerAccepted: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[DISCLAIMER_ACCEPTED] ?: false
+    }
+
+    suspend fun saveDisclaimerAccepted(accepted: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DISCLAIMER_ACCEPTED] = accepted
+        }
+    }
+
+    val appendLegalNotice: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[APPEND_LEGAL_NOTICE] ?: true
+    }
+
+    suspend fun saveAppendLegalNotice(append: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[APPEND_LEGAL_NOTICE] = append
+        }
     }
 
     val defaultLegalNotice: Flow<String> = context.dataStore.data.map { preferences ->

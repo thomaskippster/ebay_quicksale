@@ -218,11 +218,14 @@ class QuicksaleViewModel : ViewModel() {
                             .trim()
                             .replace(Regex("^\\s*[*\\-]\\s+"), "")
 
-                        val legalNotice = settingsManager.defaultLegalNotice.first()
-                        if (legalNotice.isNotBlank()) {
-                            htmlDesc += "<br><br><b>Rechtlicher Hinweis:</b> $legalNotice"
-                        } else {
-                            htmlDesc += RECHTLICHER_HINWEIS
+                        val shouldAppend = settingsManager.appendLegalNotice.first()
+                        if (shouldAppend) {
+                            val noticeText = settingsManager.defaultLegalNotice.first()
+                            if (noticeText.isNotBlank()) {
+                                htmlDesc += "<br><br><b>Rechtlicher Hinweis:</b> $noticeText"
+                            } else {
+                                htmlDesc += RECHTLICHER_HINWEIS
+                            }
                         }
 
                         val timeStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
@@ -256,7 +259,7 @@ class QuicksaleViewModel : ViewModel() {
                             imagePaths = currentPaths,
                             quantity = quantity,
                             aspects = aspectsMap,
-                            localizedLegalNotice = legalNotice
+                            localizedLegalNotice = "" // Wir laden es aus Settings
                         )
 
                         if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {

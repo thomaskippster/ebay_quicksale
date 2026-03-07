@@ -76,7 +76,33 @@ class MainActivity : ComponentActivity() {
 fun QuicksaleApp(settingsManager: SettingsManager, ebayAuthManager: EbayAuthManager) {
     val navController = rememberNavController()
     val viewModel: QuicksaleViewModel = viewModel()
+    val coroutineScope = rememberCoroutineScope()
     
+    val disclaimerAccepted by settingsManager.disclaimerAccepted.collectAsState(initial = true)
+    var showDisclaimer by remember { mutableStateOf(false) }
+
+    LaunchedEffect(disclaimerAccepted) {
+        if (!disclaimerAccepted) {
+            showDisclaimer = true
+        }
+    }
+
+    if (showDisclaimer) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Haftungsausschluss") },
+            text = { Text("Diese App ist ein Werkzeug zur Erleichterung von eBay-Verkäufen. Der Entwickler übernimmt keine Haftung für die Richtigkeit der von der KI generierten Texte, die Einhaltung von eBay-Richtlinien oder steuerliche Pflichten des Nutzers. Die Nutzung erfolgt auf eigene Gefahr.") },
+            confirmButton = {
+                Button(onClick = {
+                    coroutineScope.launch {
+                        settingsManager.saveDisclaimerAccepted(true)
+                        showDisclaimer = false
+                    }
+                }) { Text("Ich akzeptiere") }
+            }
+        )
+    }
+
     LaunchedEffect(Unit) {
         viewModel.loadDraftFromStorage(settingsManager)
     }
@@ -334,6 +360,15 @@ fun MainScreen(viewModel: QuicksaleViewModel, settingsManager: SettingsManager) 
             }
             else -> {}
         }
+
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = "Quicksale ist kein offizielles Produkt von eBay Inc. Alle Marken gehören ihren jeweiligen Eigentümern.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 16.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }
 
@@ -361,6 +396,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val isFetchingSettings by viewModel.isFetchingSettings.collectAsState()
     val defaultLegalNotice by settingsManager.defaultLegalNotice.collectAsState(initial = "")
     val ebayMarketplaceId by settingsManager.ebayMarketplaceId.collectAsState(initial = "EBAY_DE")
+    val appendLegalNotice by settingsManager.appendLegalNotice.collectAsState(initial = true)
 
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         result.data?.let { ebayAuthManager.handleAuthResponse(it, ebayClientSecret) { _, _ -> } }
@@ -368,6 +404,10 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
+        
+        Text("Sicherheitshinweis: Ihre API-Keys und Passwörter werden ausschließlich lokal auf Ihrem Gerät gespeichert. Es findet keine Übertragung an den App-Entwickler statt. Die Bilder werden verschlüsselt an Google Gemini und eBay übertragen.", 
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
         SafeTextField(value = geminiApiKey, onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } }, label = "Gemini API Key", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         HorizontalDivider()
         Text("eBay Credentials", style = MaterialTheme.typography.titleMedium)
@@ -425,7 +465,14 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             }
         }
 
-        SafeTextField(value = defaultLegalNotice, onValueChange = { coroutineScope.launch { settingsManager.saveDefaultLegalNotice(it) } }, label = "Standard-Rechtstext", modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), singleLine = false)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(checked = appendLegalNotice, onCheckedChange = { coroutineScope.launch { settingsManager.saveAppendLegalNotice(it) } })
+            Text("Standard-Rechtstext für Privatverkauf anhängen", modifier = Modifier.padding(start = 8.dp))
+        }
+        Text("Achtung: Dieser Text dient nur als Vorlage für Privatverkäufe. Prüfen Sie Ihren Verkäuferstatus (privat vs. gewerblich) eigenverantwortlich.", 
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+
+        SafeTextField(value = defaultLegalNotice, onValueChange = { coroutineScope.launch { settingsManager.saveDefaultLegalNotice(it) } }, label = "Eigener Rechtstext (optional)", modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), singleLine = false)
 
         Button(onClick = { ImageUtils.clearInternalImageStorage(context); Toast.makeText(context, "Cache geleert", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Cache manuell leeren") }
         
