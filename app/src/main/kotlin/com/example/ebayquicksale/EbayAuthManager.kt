@@ -9,27 +9,42 @@ import kotlinx.coroutines.flow.first
 class EbayAuthManager(private val context: Context, private val settingsManager: SettingsManager) {
 
     private val authService = AuthorizationService(context)
-    private val serviceConfig = AuthorizationServiceConfiguration(
-        android.net.Uri.parse("https://auth.ebay.com/oauth2/authorize"),
-        android.net.Uri.parse("https://api.ebay.com/identity/v1/oauth2/token")
-    )
 
-    fun createAuthIntent(clientId: String): Intent {
+    private fun getServiceConfig(useSandbox: Boolean): AuthorizationServiceConfiguration {
+        val authBase = if (useSandbox) "https://auth.sandbox.ebay.com" else "https://auth.ebay.com"
+        val apiBase = if (useSandbox) "https://api.sandbox.ebay.com" else "https://api.ebay.com"
+        
+        return AuthorizationServiceConfiguration(
+            android.net.Uri.parse("$authBase/oauth2/authorize"),
+            android.net.Uri.parse("$apiBase/identity/v1/oauth2/token")
+        )
+    }
+
+    fun createAuthIntent(clientId: String, ruName: String, useSandbox: Boolean): Intent {
         val request = AuthorizationRequest.Builder(
-            serviceConfig, clientId, ResponseTypeValues.CODE,
-            android.net.Uri.parse("quicksale://oauth")
-        ).setScope("https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/ebay_api_all")
+            getServiceConfig(useSandbox), clientId, ResponseTypeValues.CODE,
+            android.net.Uri.parse(ruName)
+        ).setScope("https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.account.readonly")
          .build()
         return authService.getAuthorizationRequestIntent(request)
     }
 
-    fun handleAuthResponse(intent: Intent, clientSecret: String, callback: (String?, String?) -> Unit) {
+    fun handleAuthResponse(intent: Intent, clientSecret: String, useSandbox: Boolean, callback: (String?, String?) -> Unit) {
         val response = AuthorizationResponse.fromIntent(intent)
         val ex = AuthorizationException.fromIntent(intent)
 
         if (response != null) {
             val clientAuth: ClientAuthentication = ClientSecretPost(clientSecret)
-            authService.performTokenRequest(response.createTokenExchangeRequest(), clientAuth) { tokenResponse, tokenEx ->
+            val tokenRequest = response.createTokenExchangeRequest(emptyMap())
+            // Wir müssen sicherstellen, dass der TokenRequest die richtige Konfiguration (Sandbox/Production) nutzt
+            val requestWithConfig = TokenRequest.Builder(getServiceConfig(useSandbox), tokenRequest.clientId)
+                .setAuthorizationCode(tokenRequest.authorizationCode)
+                .setRedirectUri(tokenRequest.redirectUri)
+                .setGrantType(tokenRequest.grantType)
+                .setScopes(tokenRequest.scope)
+                .build()
+
+            authService.performTokenRequest(requestWithConfig, clientAuth) { tokenResponse, tokenEx ->
                 val state = AuthState(response, tokenResponse, tokenEx)
                 if (tokenResponse != null) {
                     CoroutineScope(Dispatchers.IO).launch {
@@ -47,7 +62,7 @@ class EbayAuthManager(private val context: Context, private val settingsManager:
         }
     }
 
-    fun getValidAccessToken(clientSecret: String, callback: (String?) -> Unit) {
+    fun getValidAccessToken(clientSecret: String, useSandbox: Boolean, callback: (String?) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             val savedJson = settingsManager.ebayAuthState.first()
             if (savedJson == null) {
@@ -59,11 +74,18 @@ class EbayAuthManager(private val context: Context, private val settingsManager:
                 val authState = AuthState.jsonDeserialize(savedJson)
                 val clientAuth: ClientAuthentication = ClientSecretPost(clientSecret)
 
-                // performActionWithFreshTokens übernimmt das Refreshing automatisch
-                authState.performActionWithFreshTokens(authService, clientAuth) { accessToken, _, _ ->
+                // Wir aktualisieren die Konfiguration im AuthState, falls sich der Sandbox-Modus geändert hat
+                val config = getServiceConfig(useSandbox)
+                val updatedAuthState = AuthState(
+                    authState.lastAuthorizationResponse!!,
+                    authState.lastTokenResponse,
+                    authState.authorizationException
+                )
+
+                updatedAuthState.performActionWithFreshTokens(authService, clientAuth) { accessToken, _, _ ->
                     CoroutineScope(Dispatchers.IO).launch {
-                        settingsManager.saveEbayAuthState(authState.jsonSerializeString())
-                        settingsManager.saveEbayAccessToken(authState.accessToken)
+                        settingsManager.saveEbayAuthState(updatedAuthState.jsonSerializeString())
+                        settingsManager.saveEbayAccessToken(updatedAuthState.accessToken)
                         withContext(Dispatchers.Main) { callback(accessToken) }
                     }
                 }

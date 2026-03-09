@@ -428,7 +428,11 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     val ebayStartTime by settingsManager.ebayStartTime.collectAsState(initial = "")
     val ebayAccessToken by settingsManager.ebayAccessToken.collectAsState(initial = null)
     val ebayClientId by settingsManager.ebayClientId.collectAsState(initial = "")
+    val ebayDevId by settingsManager.ebayDevId.collectAsState(initial = "")
     val ebayClientSecret by settingsManager.ebayClientSecret.collectAsState(initial = "")
+    val ebayRuName by settingsManager.ebayRuName.collectAsState(initial = "")
+    val ebayUseSandbox by settingsManager.ebayUseSandbox.collectAsState(initial = false)
+
     val merchantLocation by settingsManager.ebayMerchantLocation.collectAsState(initial = "")
     val fulfillmentPolicy by settingsManager.ebayFulfillmentPolicy.collectAsState(initial = "")
     val paymentPolicy by settingsManager.ebayPaymentPolicy.collectAsState(initial = "")
@@ -443,7 +447,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
     var showPrivacy by remember { mutableStateOf(false) }
 
     val authLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        result.data?.let { ebayAuthManager.handleAuthResponse(it, ebayClientSecret) { _, _ -> } }
+        result.data?.let { ebayAuthManager.handleAuthResponse(it, ebayClientSecret, ebayUseSandbox) { _, _ -> } }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -455,8 +459,16 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
         SafeTextField(value = geminiApiKey, onValueChange = { coroutineScope.launch { settingsManager.saveGeminiApiKey(it) } }, label = "Gemini API Key", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         HorizontalDivider()
         Text("eBay Credentials", style = MaterialTheme.typography.titleMedium)
-        SafeTextField(value = ebayClientId, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } }, label = "Client ID", modifier = Modifier.fillMaxWidth())
-        SafeTextField(value = ebayClientSecret, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientSecret(it) } }, label = "Client Secret", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Switch(checked = ebayUseSandbox, onCheckedChange = { coroutineScope.launch { settingsManager.saveEbayUseSandbox(it) } })
+            Text("Sandbox Modus (Test-Umgebung)", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        SafeTextField(value = ebayClientId, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientId(it) } }, label = "Client ID (App ID)", modifier = Modifier.fillMaxWidth())
+        SafeTextField(value = ebayDevId, onValueChange = { coroutineScope.launch { settingsManager.saveEbayDevId(it) } }, label = "Dev ID (optional)", modifier = Modifier.fillMaxWidth())
+        SafeTextField(value = ebayClientSecret, onValueChange = { coroutineScope.launch { settingsManager.saveEbayClientSecret(it) } }, label = "Client Secret (Cert ID)", modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        SafeTextField(value = ebayRuName, onValueChange = { coroutineScope.launch { settingsManager.saveEbayRuName(it) } }, label = "RuName (Redirect URL name)", modifier = Modifier.fillMaxWidth())
         
         val marketplaces = listOf("EBAY_DE", "EBAY_AT", "EBAY_GB", "EBAY_US")
         var marketExpanded by remember { mutableStateOf(false) }
@@ -467,7 +479,7 @@ fun SettingsScreen(settingsManager: SettingsManager, ebayAuthManager: EbayAuthMa
             }
         }
 
-        Button(onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent(ebayClientId)) }, enabled = ebayClientId.isNotBlank() && ebayClientSecret.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Mit eBay verbinden") }
+        Button(onClick = { authLauncher.launch(ebayAuthManager.createAuthIntent(ebayClientId, ebayRuName, ebayUseSandbox)) }, enabled = ebayClientId.isNotBlank() && ebayClientSecret.isNotBlank() && ebayRuName.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Mit eBay verbinden") }
         Button(onClick = { ebayAccessToken?.let { viewModel.fetchEbaySettings(it, ebayMarketplaceId, settingsManager) { msg -> Toast.makeText(context, msg, Toast.LENGTH_LONG).show() } } }, enabled = ebayAccessToken != null && !isFetchingSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
             if (isFetchingSettings) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("Policies automatisch laden")
         }

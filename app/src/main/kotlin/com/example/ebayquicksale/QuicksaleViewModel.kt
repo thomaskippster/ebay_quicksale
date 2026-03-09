@@ -265,7 +265,8 @@ class QuicksaleViewModel : ViewModel() {
                         if (!ebayAccessToken.isNullOrBlank() && draft.categoryKeywords.isNotBlank()) {
                             try {
                                 val treeId = getTreeIdForMarketplace(marketplaceId)
-                                val ebayResponse = EbayRetrofitClient.ebayApiService.getCategorySuggestions(
+                                val useSandbox = settingsManager.ebayUseSandbox.first()
+                                val ebayResponse = EbayRetrofitClient.getApiService(useSandbox).getCategorySuggestions(
                                     treeId = treeId,
                                     query = draft.categoryKeywords,
                                     authorization = "Bearer $ebayAccessToken"
@@ -363,7 +364,10 @@ class QuicksaleViewModel : ViewModel() {
                     } else null
                 )
 
-                val inventoryResponse = EbayRetrofitClient.ebayApiService.createOrReplaceInventoryItem(
+                val useSandbox = settingsManager.ebayUseSandbox.first()
+                val apiService = EbayRetrofitClient.getApiService(useSandbox)
+
+                val inventoryResponse = apiService.createOrReplaceInventoryItem(
                     sku = draft.sku,
                     authorization = "Bearer $token",
                     body = inventoryRequest
@@ -395,7 +399,7 @@ class QuicksaleViewModel : ViewModel() {
                         scheduledStartTime = finalStartTime
                     )
 
-                    val offerResponse = EbayRetrofitClient.ebayApiService.createOffer(
+                    val offerResponse = apiService.createOffer(
                         authorization = "Bearer $token",
                         body = offerRequest
                     )
@@ -404,7 +408,7 @@ class QuicksaleViewModel : ViewModel() {
                         val offerId = offerResponse.body()?.offerId ?: ""
                         if (offerId.isNotBlank()) {
                             _uploadState.value = UploadUiState.Loading("Angebot wird veröffentlicht...", 0.99f)
-                            val publishResponse = EbayRetrofitClient.ebayApiService.publishOffer(
+                            val publishResponse = apiService.publishOffer(
                                 offerId = offerId,
                                 authorization = "Bearer $token"
                             )
@@ -473,7 +477,8 @@ class QuicksaleViewModel : ViewModel() {
                         imageByteArray.toRequestBody("image/jpeg".toMediaTypeOrNull())
                     )
 
-                    val responseBody = EbayRetrofitClient.ebayApiService.uploadPicture(
+                    val useSandbox = settingsManager.ebayUseSandbox.first()
+                    val responseBody = EbayRetrofitClient.getApiService(useSandbox).uploadPicture(
                         authorization = "Bearer $token",
                         xmlRequest = xmlPart,
                         picture = imagePart
@@ -499,22 +504,25 @@ class QuicksaleViewModel : ViewModel() {
             _isFetchingSettings.value = true
             try {
                 val authHeader = "Bearer $token"
-                val locationsResponse = EbayRetrofitClient.ebayApiService.getLocations(authHeader)
+                val useSandbox = settingsManager.ebayUseSandbox.first()
+                val apiService = EbayRetrofitClient.getApiService(useSandbox)
+                
+                val locationsResponse = apiService.getLocations(authHeader)
                 val locList = locationsResponse.locations ?: emptyList()
                 _locations.value = locList
                 locList.firstOrNull()?.let { settingsManager.saveEbayMerchantLocation(it.merchantLocationKey) }
 
-                val fulfillmentResponse = EbayRetrofitClient.ebayApiService.getFulfillmentPolicies(authHeader, marketplaceId)
+                val fulfillmentResponse = apiService.getFulfillmentPolicies(authHeader, marketplaceId)
                 val fullList = fulfillmentResponse.fulfillmentPolicies ?: emptyList()
                 _fulfillmentPolicies.value = fullList
                 fullList.firstOrNull()?.let { settingsManager.saveEbayFulfillmentPolicy(it.policyId) }
 
-                val paymentResponse = EbayRetrofitClient.ebayApiService.getPaymentPolicies(authHeader, marketplaceId)
+                val paymentResponse = apiService.getPaymentPolicies(authHeader, marketplaceId)
                 val payList = paymentResponse.paymentPolicies ?: emptyList()
                 _paymentPolicies.value = payList
                 payList.firstOrNull()?.let { settingsManager.saveEbayPaymentPolicy(it.policyId) }
 
-                val returnResponse = EbayRetrofitClient.ebayApiService.getReturnPolicies(authHeader, marketplaceId)
+                val returnResponse = apiService.getReturnPolicies(authHeader, marketplaceId)
                 val retList = returnResponse.returnPolicies ?: emptyList()
                 _returnPolicies.value = retList
                 retList.firstOrNull()?.let { settingsManager.saveEbayReturnPolicy(it.policyId) }

@@ -22,6 +22,7 @@ class SettingsManager(private val context: Context) {
         val EBAY_REFRESH_TOKEN = stringPreferencesKey("ebay_refresh_token")
         val EBAY_CLIENT_ID = stringPreferencesKey("ebay_client_id")
         val EBAY_CLIENT_SECRET = stringPreferencesKey("ebay_client_secret")
+        val EBAY_DEV_ID = stringPreferencesKey("ebay_dev_id")
         val EBAY_MERCHANT_LOCATION = stringPreferencesKey("ebay_merchant_location")
         val EBAY_PAYMENT_POLICY = stringPreferencesKey("ebay_payment_policy")
         val EBAY_FULFILLMENT_POLICY = stringPreferencesKey("ebay_fulfillment_policy")
@@ -31,6 +32,8 @@ class SettingsManager(private val context: Context) {
         val EBAY_AUTH_STATE = stringPreferencesKey("ebay_auth_state_json")
         val EBAY_LEGAL_NOTICE_DEFAULT = stringPreferencesKey("ebay_legal_notice_default")
         val EBAY_MARKETPLACE_ID = stringPreferencesKey("ebay_marketplace_id")
+        val EBAY_RUNAME = stringPreferencesKey("ebay_runame")
+        val EBAY_USE_SANDBOX = booleanPreferencesKey("ebay_use_sandbox")
         val DISCLAIMER_ACCEPTED = booleanPreferencesKey("disclaimer_accepted")
         val APPEND_LEGAL_NOTICE = booleanPreferencesKey("append_legal_notice")
         val KI_DISCLAIMER_ACCEPTED = booleanPreferencesKey("ki_disclaimer_accepted")
@@ -138,6 +141,10 @@ class SettingsManager(private val context: Context) {
         preferences[EBAY_CLIENT_ID] ?: ""
     }
 
+    val ebayDevId: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_DEV_ID] ?: ""
+    }
+
     val ebayClientSecret: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[EBAY_CLIENT_SECRET] ?: ""
     }
@@ -160,6 +167,14 @@ class SettingsManager(private val context: Context) {
 
     val ebayListingFormat: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[EBAY_LISTING_FORMAT] ?: "AUCTION"
+    }
+
+    val ebayRuName: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_RUNAME] ?: ""
+    }
+
+    val ebayUseSandbox: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[EBAY_USE_SANDBOX] ?: false
     }
 
     suspend fun saveGeminiApiKey(key: String) {
@@ -206,6 +221,12 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    suspend fun saveEbayDevId(id: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_DEV_ID] = id
+        }
+    }
+
     suspend fun saveEbayClientSecret(secret: String) {
         context.dataStore.edit { preferences ->
             preferences[EBAY_CLIENT_SECRET] = secret
@@ -239,6 +260,18 @@ class SettingsManager(private val context: Context) {
     suspend fun saveEbayListingFormat(format: String) {
         context.dataStore.edit { preferences ->
             preferences[EBAY_LISTING_FORMAT] = format
+        }
+    }
+
+    suspend fun saveEbayRuName(ruName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_RUNAME] = ruName
+        }
+    }
+
+    suspend fun saveEbayUseSandbox(useSandbox: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[EBAY_USE_SANDBOX] = useSandbox
         }
     }
 }
